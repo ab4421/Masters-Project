@@ -11,6 +11,7 @@ import SwiftUI
 import RoomPlan
 import UIKit // Needed for UIViewControllerRepresentable
 import SceneKit // Add this import for 3D preview
+import UniformTypeIdentifiers // Add this for file type handling
 
 // Protocol for the delegate
 protocol RoomCaptureControllerDelegate: AnyObject {
@@ -28,6 +29,10 @@ struct RoomScannerView: View {
     @Binding var capturedRoom: CapturedRoom?
     @Binding var scanAttempted: Bool
     @State private var scanState: ScanState = .intro
+    @State private var isImporting: Bool = false
+    @State private var showImportError: Bool = false
+    @State private var importError: String = ""
+    let isRoomPlanSupported: Bool
 
     var body: some View {
         switch scanState {
@@ -36,20 +41,43 @@ struct RoomScannerView: View {
                 Spacer()
                 Text("RoomPlan")
                     .font(.largeTitle).bold()
-                Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.")
-                    .multilineTextAlignment(.center)
-                    .font(.body)
+                if isRoomPlanSupported {
+                    Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.")
+                        .multilineTextAlignment(.center)
+                        .font(.body)
+                } else {
+                    Text("Your phone does not support scanning, but you can import a scan.")
+                        .multilineTextAlignment(.center)
+                        .font(.body)
+                        .foregroundColor(.orange)
+                }
                 Spacer()
-                Button(action: { scanState = .scanning }) {
-                    Text("Start Scanning")
+                HStack(spacing: 20) {
+                    Button(action: { scanState = .scanning }) {
+                        Text("Start Scanning")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isRoomPlanSupported ? Color.blue : Color.gray)
+                            .cornerRadius(20)
+                    }
+                    .disabled(!isRoomPlanSupported)
+                    
+                    Button(action: { importRoomData() }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("Import")
+                        }
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.blue)
                         .cornerRadius(20)
-                        .padding(.horizontal, 40)
+                    }
                 }
+                .padding(.horizontal, 40)
                 Spacer(minLength: 32)
             }
         case .scanning:
@@ -95,6 +123,24 @@ struct RoomScannerView: View {
                     Text("No scan data available.")
                         .foregroundColor(.gray)
                 }
+                
+                // Add import button
+                Button(action: {
+                    importRoomData()
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.down")
+                        Text("Import Scan")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(20)
+                    .padding(.horizontal, 40)
+                }
+                
                 Button(action: {
                     scanState = .intro
                     capturedRoom = nil
@@ -109,6 +155,11 @@ struct RoomScannerView: View {
                         .padding(.horizontal, 40)
                 }
                 Spacer()
+            }
+            .alert("Import Error", isPresented: $showImportError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(importError)
             }
         }
     }
@@ -144,6 +195,51 @@ struct RoomScannerView: View {
             print("Error exporting room data: \(error)")
             // TODO: Show error alert to user
         }
+    }
+
+    // Add import functionality
+    private func importRoomData() {
+        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .usdz])
+        documentPicker.delegate = ImportDocumentPickerDelegate(
+            onImport: { url in
+                handleImportedFile(at: url)
+            },
+            onError: { error in
+                importError = error
+                showImportError = true
+            }
+        )
+        
+        // Get the current window scene
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            rootViewController.present(documentPicker, animated: true)
+        }
+    }
+    
+    private func handleImportedFile(at url: URL) {
+        isImporting = true
+        
+        do {
+            if url.pathExtension == "json" {
+                let data = try Data(contentsOf: url)
+                let decoder = JSONDecoder()
+                let importedRoom = try decoder.decode(CapturedRoom.self, from: data)
+                capturedRoom = importedRoom
+                scanAttempted = true
+            } else if url.pathExtension == "usdz" {
+                // Handle USDZ import
+                // Note: RoomPlan's import capabilities are limited, so we'll show an error
+                importError = "USDZ import is not currently supported. Please import a JSON file instead."
+                showImportError = true
+            }
+        } catch {
+            importError = "Failed to import file: \(error.localizedDescription)"
+            showImportError = true
+        }
+        
+        isImporting = false
     }
 }
 
@@ -528,4 +624,46 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
             navigationItem.title = "Scan Complete" // Or based on success/failure
         }
     }
+}
+
+// Add document picker delegate
+class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
+    let onImport: (URL) -> Void
+    let onError: (String) -> Void
+    
+    init(onImport: @escaping (URL) -> Void, onError: @escaping (String) -> Void) {
+        self.onImport = onImport
+        self.onError = onError
+    }
+    
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else {
+            onError("No file selected")
+            return
+        }
+        
+        // Start accessing the security-scoped resource
+        guard url.startAccessingSecurityScopedResource() else {
+            onError("Permission denied to access the file")
+            return
+        }
+        
+        defer {
+            url.stopAccessingSecurityScopedResource()
+        }
+        
+        onImport(url)
+    }
+    
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        // Handle cancellation if needed
+    }
+}
+
+#Preview {
+    RoomScannerView(
+        capturedRoom: .constant(nil),
+        scanAttempted: .constant(false),
+        isRoomPlanSupported: true // or false to preview unsupported UI
+    )
 }
