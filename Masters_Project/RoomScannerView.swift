@@ -74,6 +74,23 @@ struct RoomScannerView: View {
                     RoomPreviewView(capturedRoom: room)
                         .frame(height: 350)
                         .padding()
+                    
+                    // Add export button
+                    Button(action: {
+                        exportRoomData(room: room)
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Export Scan")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(20)
+                        .padding(.horizontal, 40)
+                    }
                 } else {
                     Text("No scan data available.")
                         .foregroundColor(.gray)
@@ -93,6 +110,39 @@ struct RoomScannerView: View {
                 }
                 Spacer()
             }
+        }
+    }
+
+    // Add export functionality
+    private func exportRoomData(room: CapturedRoom) {
+        let destinationFolderURL = FileManager.default.temporaryDirectory.appending(path: "Export")
+        let destinationURL = destinationFolderURL.appending(path: "Room.usdz")
+        let capturedRoomURL = destinationFolderURL.appending(path: "Room.json")
+        
+        do {
+            try FileManager.default.createDirectory(at: destinationFolderURL, withIntermediateDirectories: true)
+            
+            // Export JSON data
+            let jsonEncoder = JSONEncoder()
+            let jsonData = try jsonEncoder.encode(room)
+            try jsonData.write(to: capturedRoomURL)
+            
+            // Export USDZ file
+            try room.export(to: destinationURL, exportOptions: .parametric)
+            
+            // Present share sheet
+            let activityVC = UIActivityViewController(activityItems: [destinationFolderURL], applicationActivities: nil)
+            
+            // Get the current window scene
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootViewController = window.rootViewController {
+                activityVC.modalPresentationStyle = .popover
+                rootViewController.present(activityVC, animated: true)
+            }
+        } catch {
+            print("Error exporting room data: \(error)")
+            // TODO: Show error alert to user
         }
     }
 }
@@ -145,27 +195,154 @@ struct RoomScannerRepresentable: UIViewControllerRepresentable {
     }
 }
 
-// UIViewRepresentable for RoomPlan's RoomView preview
+// UIViewRepresentable for RoomPlan preview display
 struct RoomPreviewView: UIViewRepresentable {
     let capturedRoom: CapturedRoom
+    
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
-        scnView.scene = makeScene(for: capturedRoom)
+        scnView.scene = createScene(from: capturedRoom)
         scnView.autoenablesDefaultLighting = true
         scnView.allowsCameraControl = true
+        scnView.backgroundColor = .systemBackground
+        
+        // Configure rendering settings
+        scnView.antialiasingMode = .multisampling4X
+        scnView.defaultCameraController.interactionMode = .orbitTurntable
+        scnView.defaultCameraController.target = SCNVector3Zero
+        
+        // Add ambient light
+        let ambientLight = SCNLight()
+        ambientLight.type = .ambient
+        ambientLight.intensity = 100
+        let ambientNode = SCNNode()
+        ambientNode.light = ambientLight
+        scnView.scene?.rootNode.addChildNode(ambientNode)
+        
+        // Add directional light
+        let directionalLight = SCNLight()
+        directionalLight.type = .directional
+        directionalLight.intensity = 800
+        let directionalNode = SCNNode()
+        directionalNode.light = directionalLight
+        directionalNode.position = SCNVector3(x: 5, y: 5, z: 5)
+        scnView.scene?.rootNode.addChildNode(directionalNode)
+        
+        // Set up camera
+        let camera = SCNCamera()
+        camera.zFar = 100
+        let cameraNode = SCNNode()
+        cameraNode.camera = camera
+        cameraNode.position = SCNVector3(x: 0, y: 2, z: 5)
+        scnView.scene?.rootNode.addChildNode(cameraNode)
+        
         return scnView
     }
+    
     func updateUIView(_ uiView: SCNView, context: Context) {
-        uiView.scene = makeScene(for: capturedRoom)
+        uiView.scene = createScene(from: capturedRoom)
     }
-    // Placeholder: create a simple box for now
-    private func makeScene(for room: CapturedRoom) -> SCNScene {
+    
+    private func createScene(from room: CapturedRoom) -> SCNScene {
         let scene = SCNScene()
-        // You can add more detailed geometry based on room data here
-        let box = SCNBox(width: 2, height: 1, length: 2, chamferRadius: 0.05)
-        let node = SCNNode(geometry: box)
-        node.position = SCNVector3(0, 0.5, 0)
-        scene.rootNode.addChildNode(node)
+        
+        // Add walls first
+        for wall in room.walls {
+            let geometry = SCNBox(width: CGFloat(wall.dimensions.x),
+                                height: CGFloat(wall.dimensions.y),
+                                length: CGFloat(wall.dimensions.z),
+                                chamferRadius: 0)
+            geometry.firstMaterial?.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.8)
+            geometry.firstMaterial?.transparency = 0.3
+            let node = SCNNode(geometry: geometry)
+            node.simdTransform = wall.transform
+            scene.rootNode.addChildNode(node)
+        }
+        
+        // Add openings with offset
+        for opening in room.openings {
+            let geometry = SCNBox(width: CGFloat(opening.dimensions.x),
+                                height: CGFloat(opening.dimensions.y),
+                                length: CGFloat(opening.dimensions.z),
+                                chamferRadius: 0)
+            geometry.firstMaterial?.diffuse.contents = UIColor.systemYellow.withAlphaComponent(0.4)
+            let node = SCNNode(geometry: geometry)
+            
+            // Calculate offset based on transform
+            let transform = opening.transform
+            let offset = simd_float3(0, 0, 0.01) // Small offset in Z direction
+            var newTransform = transform
+            newTransform.columns.3.x += offset.x
+            newTransform.columns.3.y += offset.y
+            newTransform.columns.3.z += offset.z
+            
+            node.simdTransform = newTransform
+            scene.rootNode.addChildNode(node)
+        }
+        
+        // Add windows with offset
+        for window in room.windows {
+            let geometry = SCNBox(width: CGFloat(window.dimensions.x),
+                                height: CGFloat(window.dimensions.y),
+                                length: CGFloat(window.dimensions.z),
+                                chamferRadius: 0)
+            geometry.firstMaterial?.diffuse.contents = UIColor.systemBlue.withAlphaComponent(0.3)
+            let node = SCNNode(geometry: geometry)
+            
+            // Calculate offset based on transform
+            let transform = window.transform
+            let offset = simd_float3(0, 0, 0.02) // Slightly larger offset for windows
+            var newTransform = transform
+            newTransform.columns.3.x += offset.x
+            newTransform.columns.3.y += offset.y
+            newTransform.columns.3.z += offset.z
+            
+            node.simdTransform = newTransform
+            scene.rootNode.addChildNode(node)
+        }
+        
+        // Add doors with offset
+        for door in room.doors {
+            let geometry = SCNBox(width: CGFloat(door.dimensions.x),
+                                height: CGFloat(door.dimensions.y),
+                                length: CGFloat(door.dimensions.z),
+                                chamferRadius: 0)
+            geometry.firstMaterial?.diffuse.contents = UIColor.brown.withAlphaComponent(0.8)
+            let node = SCNNode(geometry: geometry)
+            
+            // Calculate offset based on transform
+            let transform = door.transform
+            let offset = simd_float3(0, 0, 0.03) // Even larger offset for doors
+            var newTransform = transform
+            newTransform.columns.3.x += offset.x
+            newTransform.columns.3.y += offset.y
+            newTransform.columns.3.z += offset.z
+            
+            node.simdTransform = newTransform
+            scene.rootNode.addChildNode(node)
+        }
+        
+        // Add objects with offset
+        for object in room.objects {
+            let geometry = SCNBox(width: CGFloat(object.dimensions.x),
+                                height: CGFloat(object.dimensions.y),
+                                length: CGFloat(object.dimensions.z),
+                                chamferRadius: 0)
+            geometry.firstMaterial?.diffuse.contents = UIColor.systemGreen.withAlphaComponent(0.6)
+            let node = SCNNode(geometry: geometry)
+            
+            // Calculate offset based on transform
+            let transform = object.transform
+            let offset = simd_float3(0, 0, 0.04) // Largest offset for objects
+            var newTransform = transform
+            newTransform.columns.3.x += offset.x
+            newTransform.columns.3.y += offset.y
+            newTransform.columns.3.z += offset.z
+            
+            node.simdTransform = newTransform
+            scene.rootNode.addChildNode(node)
+        }
+        
         return scene
     }
 }

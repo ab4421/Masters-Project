@@ -75,15 +75,6 @@ struct ContentView: View {
                 }
                 .tag(3)
             }
-            .onChange(of: capturedRoom == nil) { _ in // Compare the optional state instead of the value
-                print("ContentView: capturedRoom changed.")
-                if capturedRoom != nil {
-                    print("ContentView: New CapturedRoom data received!")
-                    self.selectedTab = 1 // Switch to the recommendations tab
-                } else {
-                    print("ContentView: CapturedRoom data cleared (e.g., scan cancelled or failed).")
-                }
-            }
         } else {
             // Fallback for unsupported devices
             UnsupportedDeviceView()
