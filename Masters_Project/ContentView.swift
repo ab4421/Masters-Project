@@ -92,9 +92,30 @@ struct RecommendationView: View {
                     InfoRow(label: "Number of Doors", value: "\(room.doors.count)")
                     InfoRow(label: "Number of Windows", value: "\(room.windows.count)")
                     InfoRow(label: "Number of Openings", value: "\(room.openings.count)")
-                    InfoRow(label: "Objects Identified", value: "\(room.objects.count)")
-
-                    // TODO: Implement simulated object detection and recommendation logic here
+                    
+                    // Display detected objects
+                    Text("Detected Objects:")
+                        .font(.headline)
+                        .padding(.top)
+                    
+                    Text("Total Objects: \(room.objects.count)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.bottom, 5)
+                    
+                    if room.objects.isEmpty {
+                        Text("No objects detected")
+                            .foregroundColor(.gray)
+                    } else {
+                        ForEach(Array(room.objects.enumerated()), id: \.offset) { index, object in
+                            HStack {
+                                Text("• \(String(describing: object.category))")
+                                    .font(.body)
+                                Spacer()
+                            }
+                            .padding(.leading)
+                        }
+                    }
 
                 } else {
                     Text("No room data available yet. Please scan a room first.")
