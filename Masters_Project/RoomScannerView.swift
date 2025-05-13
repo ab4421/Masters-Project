@@ -32,6 +32,7 @@ struct RoomScannerView: View {
     @State private var isImporting: Bool = false
     @State private var showImportError: Bool = false
     @State private var importError: String = ""
+    @State private var documentPickerDelegate: ImportDocumentPickerDelegate?
     let isRoomPlanSupported: Bool
 
     var body: some View {
@@ -199,47 +200,96 @@ struct RoomScannerView: View {
 
     // Add import functionality
     private func importRoomData() {
-        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .usdz])
-        documentPicker.delegate = ImportDocumentPickerDelegate(
+        // Create and store the delegate
+        let delegate = ImportDocumentPickerDelegate(
             onImport: { url in
-                handleImportedFile(at: url)
+                self.handleImportedFile(at: url)
             },
             onError: { error in
-                importError = error
-                showImportError = true
+                self.importError = error
+                self.showImportError = true
             }
         )
+        
+        // Store the delegate to prevent deallocation
+        documentPickerDelegate = delegate
+        
+        // Define the JSON type explicitly
+        let jsonType = UTType.json
+        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [jsonType])
+        documentPicker.delegate = delegate
         
         // Get the current window scene
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first,
            let rootViewController = window.rootViewController {
-            rootViewController.present(documentPicker, animated: true)
+            // Present the picker on the main thread
+            DispatchQueue.main.async {
+                rootViewController.present(documentPicker, animated: true)
+            }
         }
     }
     
     private func handleImportedFile(at url: URL) {
-        isImporting = true
-        
-        do {
-            if url.pathExtension == "json" {
-                let data = try Data(contentsOf: url)
-                let decoder = JSONDecoder()
-                let importedRoom = try decoder.decode(CapturedRoom.self, from: data)
-                capturedRoom = importedRoom
-                scanAttempted = true
-            } else if url.pathExtension == "usdz" {
-                // Handle USDZ import
-                // Note: RoomPlan's import capabilities are limited, so we'll show an error
-                importError = "USDZ import is not currently supported. Please import a JSON file instead."
-                showImportError = true
-            }
-        } catch {
-            importError = "Failed to import file: \(error.localizedDescription)"
-            showImportError = true
+        // Ensure we're on the main thread for UI updates
+        DispatchQueue.main.async {
+            self.isImporting = true
         }
         
-        isImporting = false
+        do {
+            // Read the file data
+            let data = try Data(contentsOf: url)
+            
+            // Validate that we have data
+            guard !data.isEmpty else {
+                throw ImportError.emptyFile
+            }
+            
+            // Try to decode the JSON
+            let decoder = JSONDecoder()
+            let importedRoom = try decoder.decode(CapturedRoom.self, from: data)
+            
+            // Validate the imported room has basic required elements
+            guard !importedRoom.walls.isEmpty else {
+                throw ImportError.invalidRoomData("No walls found in the imported room")
+            }
+            
+            // Update the state on the main thread
+            DispatchQueue.main.async {
+                self.capturedRoom = importedRoom
+                self.scanAttempted = true
+                self.scanState = .preview // Move to preview state after successful import
+                self.isImporting = false
+            }
+            
+        } catch let error as ImportError {
+            DispatchQueue.main.async {
+                self.importError = error.localizedDescription
+                self.showImportError = true
+                self.isImporting = false
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.importError = "Failed to import file: \(error.localizedDescription)"
+                self.showImportError = true
+                self.isImporting = false
+            }
+        }
+    }
+    
+    // Define specific import errors
+    enum ImportError: LocalizedError {
+        case emptyFile
+        case invalidRoomData(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .emptyFile:
+                return "The selected file is empty"
+            case .invalidRoomData(let message):
+                return "Invalid room data: \(message)"
+            }
+        }
     }
 }
 
@@ -626,7 +676,7 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
     }
 }
 
-// Add document picker delegate
+// Update the ImportDocumentPickerDelegate to be more robust
 class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     let onImport: (URL) -> Void
     let onError: (String) -> Void
@@ -634,6 +684,7 @@ class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     init(onImport: @escaping (URL) -> Void, onError: @escaping (String) -> Void) {
         self.onImport = onImport
         self.onError = onError
+        super.init()
     }
     
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
@@ -657,6 +708,11 @@ class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
         // Handle cancellation if needed
+    }
+    
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
+        // This is the correct method name, but we're already handling it in didPickDocumentsAt
+        // So we can leave this empty or remove it
     }
 }
 
