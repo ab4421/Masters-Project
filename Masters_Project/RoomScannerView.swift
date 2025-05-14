@@ -445,6 +445,33 @@ struct RoomPreviewView: UIViewRepresentable {
             
             node.simdTransform = newTransform
             scene.rootNode.addChildNode(node)
+
+            // Add text label for the window
+            let labelText = "Window"
+            let textGeometry = SCNText(string: labelText, extrusionDepth: 0.01)
+            textGeometry.font = UIFont.systemFont(ofSize: 0.22)
+            textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+            textGeometry.flatness = 0.2
+
+            let textNode = SCNNode(geometry: textGeometry)
+            let billboardConstraint = SCNBillboardConstraint()
+            billboardConstraint.freeAxes = .all
+            textNode.constraints = [billboardConstraint]
+
+            let (min, max) = textGeometry.boundingBox
+            let textWidth = max.x - min.x
+            let textHeight = max.y - min.y
+            textNode.pivot = SCNMatrix4MakeTranslation((min.x + textWidth / 2), (min.y + textHeight / 2), 0)
+
+            // Position the label just above the window
+            let textOffset = simd_float3(0, Float(window.dimensions.y) / 2 + 0.05, 0)
+            var textTransform = newTransform
+            textTransform.columns.3.x += textOffset.x
+            textTransform.columns.3.y += textOffset.y
+            textTransform.columns.3.z += textOffset.z
+            textNode.simdTransform = textTransform
+
+            scene.rootNode.addChildNode(textNode)
         }
         
         // Add doors with offset
@@ -466,9 +493,36 @@ struct RoomPreviewView: UIViewRepresentable {
             
             node.simdTransform = newTransform
             scene.rootNode.addChildNode(node)
+
+            // Add text label for the door
+            let labelText = "Door"
+            let textGeometry = SCNText(string: labelText, extrusionDepth: 0.01)
+            textGeometry.font = UIFont.systemFont(ofSize: 0.22)
+            textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+            textGeometry.flatness = 0.2
+
+            let textNode = SCNNode(geometry: textGeometry)
+            let billboardConstraint = SCNBillboardConstraint()
+            billboardConstraint.freeAxes = .all
+            textNode.constraints = [billboardConstraint]
+
+            let (min, max) = textGeometry.boundingBox
+            let textWidth = max.x - min.x
+            let textHeight = max.y - min.y
+            textNode.pivot = SCNMatrix4MakeTranslation((min.x + textWidth / 2), (min.y + textHeight / 2), 0)
+
+            // Position the label just above the door
+            let textOffset = simd_float3(0, Float(door.dimensions.y) / 2 + 0.05, 0)
+            var textTransform = newTransform
+            textTransform.columns.3.x += textOffset.x
+            textTransform.columns.3.y += textOffset.y
+            textTransform.columns.3.z += textOffset.z
+            textNode.simdTransform = textTransform
+
+            scene.rootNode.addChildNode(textNode)
         }
         
-        // Add objects with offset
+        // Add objects with offset and labels
         for object in room.objects {
             let geometry = SCNBox(width: CGFloat(object.dimensions.x),
                                 height: CGFloat(object.dimensions.y),
@@ -487,6 +541,36 @@ struct RoomPreviewView: UIViewRepresentable {
             
             node.simdTransform = newTransform
             scene.rootNode.addChildNode(node)
+            
+            // Add text label for the object
+            let labelText = String(describing: object.category)
+            let textGeometry = SCNText(string: labelText, extrusionDepth: 0.01)
+            textGeometry.font = UIFont.systemFont(ofSize: 0.22)
+            textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+            textGeometry.flatness = 0.2
+
+            let textNode = SCNNode(geometry: textGeometry)
+
+            // Add billboarding so the text always faces the camera
+            let billboardConstraint = SCNBillboardConstraint()
+            billboardConstraint.freeAxes = .all
+            textNode.constraints = [billboardConstraint]
+
+            // Center the text geometry in both X and Y
+            let (min, max) = textGeometry.boundingBox
+            let textWidth = max.x - min.x
+            let textHeight = max.y - min.y
+            textNode.pivot = SCNMatrix4MakeTranslation((min.x + textWidth / 2), (min.y + textHeight / 2), 0)
+
+            // Position the label just above the object
+            let textOffset = simd_float3(0, Float(object.dimensions.y) / 2 + 0.05, 0)
+            var textTransform = newTransform
+            textTransform.columns.3.x += textOffset.x
+            textTransform.columns.3.y += textOffset.y
+            textTransform.columns.3.z += textOffset.z
+            textNode.simdTransform = textTransform
+
+            scene.rootNode.addChildNode(textNode)
         }
         
         return scene
