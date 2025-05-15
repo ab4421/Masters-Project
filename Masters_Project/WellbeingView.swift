@@ -20,26 +20,24 @@ struct WellbeingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Description outside the form
-            Text("This is the Residential Eudaimonic Need Satisfaction Scale (RENSS), which measures how well your psychological needs are being met at home.")
-                .font(.callout)
-                .fontWeight(.regular)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.leading)
-                .padding([.horizontal, .top])
-                .padding(.bottom, 8)
-
-            Form {
-                // Instruction and legend at the top of the form, no extra section
+            // Static header with description, instruction, and legend
+            VStack(alignment: .leading, spacing: 8) {
+                Text("The Residential Eudaimonic Need Satisfaction Scale (RENSS) measures how well your psychological needs are being met at home.")
+                    .font(.callout)
+                    .fontWeight(.regular)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                Divider()
                 Text("Please indicate how often you feel the following when you are at home. When I am at home, I feel...")
                     .font(.callout)
                     .foregroundColor(.primary)
-                    .padding(.bottom, 0)
                 Text(legend)
                     .font(.footnote)
                     .foregroundColor(.secondary)
-                    .padding(.bottom, 4)
-
+            }
+            .padding()
+            // Scrollable form below
+            Form {
                 ForEach(0..<questions.count, id: \ .self) { i in
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(i+1). \(questions[i])")
@@ -59,7 +57,7 @@ struct WellbeingView: View {
                 .disabled(answers.contains(0))
                 .frame(maxWidth: .infinity, alignment: .center)
             }
-            .navigationTitle("RENSS")
+            .navigationTitle("Wellbeing Scale")
         }
     }
 }
