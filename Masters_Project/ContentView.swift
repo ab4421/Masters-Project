@@ -56,8 +56,7 @@ struct ContentView: View {
             .tag(1)
 
             NavigationView {
-                Text("Wellbeing Log (Placeholder)")
-                    .navigationTitle("Wellbeing")
+                WellbeingView()
             }
             .tabItem {
                 Label("Wellbeing", systemImage: "heart.text.square")
