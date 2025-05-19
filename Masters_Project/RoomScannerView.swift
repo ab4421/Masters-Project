@@ -636,8 +636,6 @@ struct RoomPreviewView: UIViewRepresentable {
         // Add camera path visualization
         if pathPoints.count > 1 {
             var vertices: [SCNVector3] = []
-            var indices: [Int32] = []
-
             for point in pathPoints {
                 let position = SCNVector3(
                     x: Float(point.position.x),
@@ -646,23 +644,58 @@ struct RoomPreviewView: UIViewRepresentable {
                 )
                 vertices.append(position)
             }
-            // Correct indices logic: connect each consecutive pair
+            // Draw tubes (cylinders) between consecutive points using quaternions for robust alignment
             for i in 0..<(vertices.count - 1) {
-                indices.append(Int32(i))
-                indices.append(Int32(i + 1))
+                let start = vertices[i]
+                let end = vertices[i + 1]
+                let vector = SCNVector3(end.x - start.x, end.y - start.y, end.z - start.z)
+                let distance = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
+                if distance < 0.001 { continue } // Filter out zero-length segments
+                let midPoint = SCNVector3((start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2)
+
+                let cylinder = SCNCylinder(radius: 0.025, height: CGFloat(distance))
+                let material = SCNMaterial()
+                material.diffuse.contents = UIColor.systemBlue
+                material.transparency = 0.7
+                cylinder.materials = [material]
+
+                let cylinderNode = SCNNode(geometry: cylinder)
+                cylinderNode.position = midPoint
+
+                // Quaternion-based rotation
+                let up = SCNVector3(0, 1, 0)
+                let v = vector
+                let vNorm = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+                let vUnit = SCNVector3(v.x / vNorm, v.y / vNorm, v.z / vNorm)
+                let dot = up.x * vUnit.x + up.y * vUnit.y + up.z * vUnit.z
+                if abs(dot - 1.0) < 1e-6 {
+                    // Already aligned
+                    cylinderNode.orientation = SCNQuaternion(0, 0, 0, 1)
+                } else if abs(dot + 1.0) < 1e-6 {
+                    // Opposite direction
+                    cylinderNode.orientation = SCNQuaternion(1, 0, 0, Float.pi)
+                } else {
+                    let axis = SCNVector3(
+                        up.y * vUnit.z - up.z * vUnit.y,
+                        up.z * vUnit.x - up.x * vUnit.z,
+                        up.x * vUnit.y - up.y * vUnit.x
+                    )
+                    let axisNorm = sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z)
+                    let axisUnit = SCNVector3(axis.x / axisNorm, axis.y / axisNorm, axis.z / axisNorm)
+                    let angle = acos(dot)
+                    let halfAngle = angle / 2.0
+                    let sinHalfAngle = sin(halfAngle)
+                    let q = SCNQuaternion(
+                        axisUnit.x * sinHalfAngle,
+                        axisUnit.y * sinHalfAngle,
+                        axisUnit.z * sinHalfAngle,
+                        cos(halfAngle)
+                    )
+                    cylinderNode.orientation = q
+                }
+
+                scene.rootNode.addChildNode(cylinderNode)
             }
-
-            let source = SCNGeometrySource(vertices: vertices)
-            let element = SCNGeometryElement(indices: indices, primitiveType: .line)
-            let lineGeometry = SCNGeometry(sources: [source], elements: [element])
-            let material = SCNMaterial()
-            material.diffuse.contents = UIColor.systemBlue
-            material.transparency = 0.7
-            lineGeometry.materials = [material]
-
-            let pathNode = SCNNode(geometry: lineGeometry)
-            scene.rootNode.addChildNode(pathNode)
-
             // Add start and end spheres for visibility
             if let first = vertices.first, let last = vertices.last {
                 let startSphere = SCNSphere(radius: 0.08) // Larger radius
