@@ -12,6 +12,57 @@ import RoomPlan
 import UIKit // Needed for UIViewControllerRepresentable
 import SceneKit // Add this import for 3D preview
 import UniformTypeIdentifiers // Add this for file type handling
+import simd // Add this for vector operations
+import ARKit // Add this for AR session access
+
+// Path tracking structures and manager
+public struct PathPoint {
+    let position: SIMD3<Float>
+    let timestamp: TimeInterval
+    let confidence: Float
+}
+
+public class PathTrackingManager {
+    private var pathPoints: [PathPoint] = []
+    private var lastUpdateTime: TimeInterval = 0
+    private let updateInterval: TimeInterval = 2.0 // Update every 2 seconds
+    private let minDistanceThreshold: Float = 0.1 // Minimum distance between points (10cm)
+    
+    public init() {} // Add public initializer
+    
+    public func updatePath(with position: SIMD3<Float>, confidence: Float) {
+        let currentTime = CACurrentMediaTime()
+        // Always add the very first point
+        if pathPoints.isEmpty {
+            pathPoints.append(PathPoint(position: position, timestamp: currentTime, confidence: confidence))
+            lastUpdateTime = currentTime
+            return
+        }
+        // Check if enough time has passed
+        guard currentTime - lastUpdateTime >= updateInterval else { return }
+        // Check if we have enough distance from the last point
+        if let lastPoint = pathPoints.last {
+            let distance = simd_distance(position, lastPoint.position)
+            guard distance >= minDistanceThreshold else { return }
+        }
+        // Add new point
+        pathPoints.append(PathPoint(
+            position: position,
+            timestamp: currentTime,
+            confidence: confidence
+        ))
+        lastUpdateTime = currentTime
+    }
+    
+    public func getPathPoints() -> [PathPoint] {
+        return pathPoints
+    }
+    
+    public func clearPath() {
+        pathPoints.removeAll()
+        lastUpdateTime = 0
+    }
+}
 
 // Protocol for the delegate
 protocol RoomCaptureControllerDelegate: AnyObject {
@@ -33,6 +84,7 @@ struct RoomScannerView: View {
     @State private var showImportError: Bool = false
     @State private var importError: String = ""
     @State private var documentPickerDelegate: ImportDocumentPickerDelegate?
+    @State var pathTrackingManager = PathTrackingManager()
     let isRoomPlanSupported: Bool
 
     var body: some View {
@@ -85,9 +137,11 @@ struct RoomScannerView: View {
             RoomScannerRepresentable(
                 capturedRoom: $capturedRoom,
                 scanAttempted: $scanAttempted,
+                pathTrackingManager: pathTrackingManager,
                 onCancel: {
                     scanState = .intro
                     capturedRoom = nil
+                    pathTrackingManager.clearPath()
                 },
                 onDone: {
                     scanState = .preview
@@ -100,9 +154,12 @@ struct RoomScannerView: View {
                     .font(.title2).bold()
                     .padding(.top)
                 if let room = capturedRoom {
-                    RoomPreviewView(capturedRoom: room)
-                        .frame(height: 350)
-                        .padding()
+                    RoomPreviewView(
+                        capturedRoom: room,
+                        pathPoints: pathTrackingManager.getPathPoints()
+                    )
+                    .frame(height: 350)
+                    .padding()
                     
                     // Add export button
                     Button(action: {
@@ -297,12 +354,14 @@ struct RoomScannerView: View {
 struct RoomScannerRepresentable: UIViewControllerRepresentable {
     @Binding var capturedRoom: CapturedRoom?
     @Binding var scanAttempted: Bool
+    var pathTrackingManager: PathTrackingManager
     var onCancel: () -> Void
     var onDone: () -> Void
 
     func makeUIViewController(context: Context) -> UINavigationController {
         let viewController = RoomCaptureViewControllerSwiftUI()
         viewController.delegate = context.coordinator
+        viewController.pathTrackingManager = pathTrackingManager
         viewController.onCancel = onCancel
         viewController.onDone = onDone
         let navController = UINavigationController(rootViewController: viewController)
@@ -344,6 +403,7 @@ struct RoomScannerRepresentable: UIViewControllerRepresentable {
 // UIViewRepresentable for RoomPlan preview display
 struct RoomPreviewView: UIViewRepresentable {
     let capturedRoom: CapturedRoom
+    let pathPoints: [PathPoint]
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
@@ -573,19 +633,65 @@ struct RoomPreviewView: UIViewRepresentable {
             scene.rootNode.addChildNode(textNode)
         }
         
+        // Add camera path visualization
+        if pathPoints.count > 1 {
+            var vertices: [SCNVector3] = []
+            var indices: [Int32] = []
+
+            for point in pathPoints {
+                let position = SCNVector3(
+                    x: Float(point.position.x),
+                    y: Float(point.position.y) + 0.1,
+                    z: Float(point.position.z)
+                )
+                vertices.append(position)
+            }
+            // Correct indices logic: connect each consecutive pair
+            for i in 0..<(vertices.count - 1) {
+                indices.append(Int32(i))
+                indices.append(Int32(i + 1))
+            }
+
+            let source = SCNGeometrySource(vertices: vertices)
+            let element = SCNGeometryElement(indices: indices, primitiveType: .line)
+            let lineGeometry = SCNGeometry(sources: [source], elements: [element])
+            let material = SCNMaterial()
+            material.diffuse.contents = UIColor.systemBlue
+            material.transparency = 0.7
+            lineGeometry.materials = [material]
+
+            let pathNode = SCNNode(geometry: lineGeometry)
+            scene.rootNode.addChildNode(pathNode)
+
+            // Add start and end spheres for visibility
+            if let first = vertices.first, let last = vertices.last {
+                let startSphere = SCNSphere(radius: 0.08) // Larger radius
+                startSphere.firstMaterial?.diffuse.contents = UIColor.systemGreen // Green for start
+                let startNode = SCNNode(geometry: startSphere)
+                startNode.position = SCNVector3(first.x, first.y + 0.07, first.z) // Offset above path
+                scene.rootNode.addChildNode(startNode)
+
+                let endSphere = SCNSphere(radius: 0.08)
+                endSphere.firstMaterial?.diffuse.contents = UIColor.systemRed // Red for end
+                let endNode = SCNNode(geometry: endSphere)
+                endNode.position = SCNVector3(last.x, last.y + 0.07, last.z)
+                scene.rootNode.addChildNode(endNode)
+            }
+        }
+        
         return scene
     }
 }
 
 // This is our adapted UIKit ViewController that will host RoomCaptureView
-class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegate, RoomCaptureSessionDelegate {
+class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegate, RoomCaptureSessionDelegate, ARSessionDelegate {
 
     weak var delegate: RoomCaptureControllerDelegate?
 
     private var roomCaptureView: RoomCaptureView!
     private var roomCaptureSessionConfig: RoomCaptureSession.Configuration = RoomCaptureSession.Configuration()
     private var isScanning: Bool = false
-    // No need to store finalResults here if we pass it directly via delegate
+    var pathTrackingManager: PathTrackingManager!
     
     // UI Elements (programmatic as it's simpler for this wrapper)
     private var doneButton: UIBarButtonItem!
@@ -594,18 +700,18 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
 
     var onCancel: () -> Void = {}
     var onDone: () -> Void = {}
+    
+    // Add a property to store the current camera position
+    private var currentCameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Set a background color to see the view bounds if needed during debugging
-        // view.backgroundColor = .systemGray5
         
         setupRoomCaptureView()
         setupNavigationBar()
         
         activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.translatesAutoresizingMaskIntoConstraints = false // For programmatic constraints
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(activityIndicator)
         NSLayoutConstraint.activate([
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -626,11 +732,15 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
     }
 
     private func setupRoomCaptureView() {
+        // Create RoomCaptureView
         roomCaptureView = RoomCaptureView(frame: view.bounds)
-        roomCaptureView.autoresizingMask = [.flexibleWidth, .flexibleHeight] // Ensure it resizes
+        roomCaptureView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         roomCaptureView.captureSession.delegate = self
         roomCaptureView.delegate = self
         view.insertSubview(roomCaptureView, at: 0)
+        
+        // Set up AR session delegate
+        roomCaptureView.captureSession.arSession.delegate = self
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -658,7 +768,10 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
     private func startSession() {
         print("Attempting to start RoomPlan session...")
         isScanning = true
-        roomCaptureView?.captureSession.run(configuration: roomCaptureSessionConfig)
+        
+        // Configure and start the session
+        let configuration = RoomCaptureSession.Configuration()
+        roomCaptureView?.captureSession.run(configuration: configuration)
         updateNavBarForActiveScan(isActive: true)
     }
 
@@ -703,11 +816,32 @@ class RoomCaptureViewControllerSwiftUI: UIViewController, RoomCaptureViewDelegat
         onDone() // Notify SwiftUI to show preview
     }
     
+    // ARSessionDelegate method to get camera updates
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // Get the camera transform from the current frame
+        let cameraTransform = frame.camera.transform
+        
+        // Extract position from the transform matrix
+        let position = SIMD3<Float>(
+            cameraTransform.columns.3.x,
+            cameraTransform.columns.3.y,
+            cameraTransform.columns.3.z
+        )
+        
+        // Update the current camera position
+        currentCameraPosition = position
+        
+        // Update the path with the new position
+        // Using a default confidence of 1.0 for now
+        pathTrackingManager.updatePath(with: position, confidence: 1.0)
+        
+        // Print the position for testing
+        print("Camera position: \(position)")
+    }
+
     // RoomCaptureSessionDelegate
     func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
-        // This delegate provides live updates *during* the scan.
-        // You can use this for live feedback if desired, but not essential for MVP.
-        // print("captureSession:didUpdate - Live room model updated.")
+        // We'll keep this empty as we're using ARSession for tracking
     }
 
     func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
