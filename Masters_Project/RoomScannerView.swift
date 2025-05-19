@@ -16,10 +16,51 @@ import simd // Add this for vector operations
 import ARKit // Add this for AR session access
 
 // Path tracking structures and manager
-public struct PathPoint {
+public struct PathPoint: Codable {
     let position: SIMD3<Float>
     let timestamp: TimeInterval
     let confidence: Float
+    
+    // Add coding keys to handle SIMD3<Float> serialization
+    enum CodingKeys: String, CodingKey {
+        case positionX, positionY, positionZ
+        case timestamp
+        case confidence
+    }
+    
+    // Custom encoding for SIMD3<Float>
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(position.x, forKey: .positionX)
+        try container.encode(position.y, forKey: .positionY)
+        try container.encode(position.z, forKey: .positionZ)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(confidence, forKey: .confidence)
+    }
+    
+    // Custom decoding for SIMD3<Float>
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let x = try container.decode(Float.self, forKey: .positionX)
+        let y = try container.decode(Float.self, forKey: .positionY)
+        let z = try container.decode(Float.self, forKey: .positionZ)
+        position = SIMD3<Float>(x, y, z)
+        timestamp = try container.decode(TimeInterval.self, forKey: .timestamp)
+        confidence = try container.decode(Float.self, forKey: .confidence)
+    }
+    
+    // Keep the existing initializer
+    public init(position: SIMD3<Float>, timestamp: TimeInterval, confidence: Float) {
+        self.position = position
+        self.timestamp = timestamp
+        self.confidence = confidence
+    }
+}
+
+// Wrapper structure for export data
+struct RoomExportData: Codable {
+    let room: CapturedRoom
+    let pathPoints: [PathPoint]
 }
 
 public class PathTrackingManager {
@@ -61,6 +102,14 @@ public class PathTrackingManager {
     public func clearPath() {
         pathPoints.removeAll()
         lastUpdateTime = 0
+    }
+    
+    // New method for directly setting path points during import
+    public func setPathPoints(_ points: [PathPoint]) {
+        pathPoints = points
+        if let lastPoint = points.last {
+            lastUpdateTime = lastPoint.timestamp
+        }
     }
 }
 
@@ -231,9 +280,16 @@ struct RoomScannerView: View {
         do {
             try FileManager.default.createDirectory(at: destinationFolderURL, withIntermediateDirectories: true)
             
+            // Create export data wrapper
+            let exportData = RoomExportData(
+                room: room,
+                pathPoints: pathTrackingManager.getPathPoints()
+            )
+            
             // Export JSON data
             let jsonEncoder = JSONEncoder()
-            let jsonData = try jsonEncoder.encode(room)
+            jsonEncoder.outputFormatting = .prettyPrinted // Make the JSON more readable
+            let jsonData = try jsonEncoder.encode(exportData)
             try jsonData.write(to: capturedRoomURL)
             
             // Export USDZ file
@@ -304,16 +360,18 @@ struct RoomScannerView: View {
             
             // Try to decode the JSON
             let decoder = JSONDecoder()
-            let importedRoom = try decoder.decode(CapturedRoom.self, from: data)
+            let importedData = try decoder.decode(RoomExportData.self, from: data)
             
             // Validate the imported room has basic required elements
-            guard !importedRoom.walls.isEmpty else {
+            guard !importedData.room.walls.isEmpty else {
                 throw ImportError.invalidRoomData("No walls found in the imported room")
             }
             
             // Update the state on the main thread
             DispatchQueue.main.async {
-                self.capturedRoom = importedRoom
+                self.capturedRoom = importedData.room
+                // Use the new setPathPoints method instead of updatePath
+                self.pathTrackingManager.setPathPoints(importedData.pathPoints)
                 self.scanAttempted = true
                 self.scanState = .preview // Move to preview state after successful import
                 self.isImporting = false
