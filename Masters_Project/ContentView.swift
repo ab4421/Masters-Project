@@ -56,12 +56,20 @@ struct ContentView: View {
             .tag(1)
 
             NavigationView {
+                HabitChecklistView()
+            }
+            .tabItem {
+                Label("Checklist", systemImage: "checklist")
+            }
+            .tag(2)
+
+            NavigationView {
                 WellbeingView()
             }
             .tabItem {
                 Label("Wellbeing", systemImage: "heart.text.square")
             }
-            .tag(2)
+            .tag(3)
 
             NavigationView {
                 Text("Settings (Placeholder)")
@@ -70,7 +78,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(3)
+            .tag(4)
         }
     }
 }
