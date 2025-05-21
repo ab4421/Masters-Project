@@ -33,8 +33,7 @@ struct ContentView: View {
             // Embed RecommendationView in a NavigationView for its own title
             NavigationView {
                 if scanAttempted && capturedRoom != nil {
-                    RecommendationView(roomData: capturedRoom)
-                    // .navigationTitle("Recommendations") // Title can be set in RecommendationView itself
+                    HabitSelectionView(roomData: capturedRoom)
                 } else {
                     VStack {
                         Text("Scan a room to see recommendations.")
@@ -88,50 +87,7 @@ struct RecommendationView: View {
     let roomData: CapturedRoom? // Will receive the captured room data
 
     var body: some View {
-        ScrollView { // Make content scrollable if it gets long
-            VStack(alignment: .leading, spacing: 15) { // Add spacing and alignment
-                if let room = roomData {
-                    Text("Scan Analysis:")
-                        .font(.title2)
-                        .padding(.bottom, 5)
-                    
-                    InfoRow(label: "Number of Walls", value: "\(room.walls.count)")
-                    InfoRow(label: "Number of Doors", value: "\(room.doors.count)")
-                    InfoRow(label: "Number of Windows", value: "\(room.windows.count)")
-                    InfoRow(label: "Number of Openings", value: "\(room.openings.count)")
-                    
-                    // Display detected objects
-                    Text("Detected Objects:")
-                        .font(.headline)
-                        .padding(.top)
-                    
-                    Text("Total Objects: \(room.objects.count)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.bottom, 5)
-                    
-                    if room.objects.isEmpty {
-                        Text("No objects detected")
-                            .foregroundColor(.gray)
-                    } else {
-                        ForEach(Array(room.objects.enumerated()), id: \.offset) { index, object in
-                            HStack {
-                                Text("• \(String(describing: object.category))")
-                                    .font(.body)
-                                Spacer()
-                            }
-                            .padding(.leading)
-                        }
-                    }
-
-                } else {
-                    Text("No room data available yet. Please scan a room first.")
-                }
-            }
-            .padding() // Add padding around the VStack content
-        }
-        .navigationTitle("Your Recommendations")
-        .navigationBarTitleDisplayMode(.inline)
+        HabitSelectionView(roomData: roomData)
     }
 }
 
