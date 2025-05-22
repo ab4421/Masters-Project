@@ -13,15 +13,21 @@ struct ContentView: View {
     @State private var capturedRoom: CapturedRoom? = nil // Explicitly initialize as nil
     @State private var selectedTab: Int = 0 // To programmatically change tabs
     @State private var scanAttempted: Bool = false // To know if we should even try to show recommendations
+    @State private var pathPoints: [PathPoint] = []
     let isRoomPlanSupported = RoomCaptureSession.isSupported
 
     var body: some View {
         TabView(selection: $selectedTab) { // Add selection binding
             // Embed RoomScannerView in a NavigationView if you want a title bar for it
             NavigationView {
-                RoomScannerView(capturedRoom: $capturedRoom, scanAttempted: $scanAttempted, isRoomPlanSupported: isRoomPlanSupported)
-                    // .navigationTitle("Scan Room") // Title now set in RoomCaptureViewControllerSwiftUI
-                    // .navigationBarTitleDisplayMode(.inline)
+                RoomScannerView(
+                    capturedRoom: $capturedRoom,
+                    scanAttempted: $scanAttempted,
+                    isRoomPlanSupported: isRoomPlanSupported,
+                    onPathPointsUpdated: { points in
+                        pathPoints = points
+                    }
+                )
             }
             .tabItem {
                 Label("Scan Room", systemImage: "camera.metering.matrix")
@@ -33,7 +39,10 @@ struct ContentView: View {
             // Embed RecommendationView in a NavigationView for its own title
             NavigationView {
                 if scanAttempted && capturedRoom != nil {
-                    HabitSelectionView(roomData: capturedRoom)
+                    HabitSelectionView(
+                        roomData: capturedRoom,
+                        pathPoints: pathPoints
+                    )
                 } else {
                     VStack {
                         Text("Scan a room to see recommendations.")
@@ -84,10 +93,14 @@ struct ContentView: View {
 
 // Placeholder Recommendation View
 struct RecommendationView: View {
-    let roomData: CapturedRoom? // Will receive the captured room data
+    let roomData: CapturedRoom?
+    let pathPoints: [PathPoint]
 
     var body: some View {
-        HabitSelectionView(roomData: roomData)
+        HabitSelectionView(
+            roomData: roomData,
+            pathPoints: pathPoints
+        )
     }
 }
 

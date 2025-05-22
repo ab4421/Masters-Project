@@ -128,13 +128,15 @@ enum ScanState {
 struct RoomScannerView: View {
     @Binding var capturedRoom: CapturedRoom?
     @Binding var scanAttempted: Bool
+    let isRoomPlanSupported: Bool
+    let onPathPointsUpdated: ([PathPoint]) -> Void
+    
     @State private var scanState: ScanState = .intro
     @State private var isImporting: Bool = false
     @State private var showImportError: Bool = false
     @State private var importError: String = ""
     @State private var documentPickerDelegate: ImportDocumentPickerDelegate?
     @State var pathTrackingManager = PathTrackingManager()
-    let isRoomPlanSupported: Bool
 
     var body: some View {
         switch scanState {
@@ -205,7 +207,10 @@ struct RoomScannerView: View {
                 if let room = capturedRoom {
                     RoomPreviewView(
                         capturedRoom: room,
-                        pathPoints: pathTrackingManager.getPathPoints()
+                        pathPoints: pathTrackingManager.getPathPoints(),
+                        visualElements: [],
+                        recommendedObjectIndex: nil,
+                        candidateObjectIndices: []
                     )
                     .frame(height: 350)
                     .padding()
@@ -370,8 +375,8 @@ struct RoomScannerView: View {
             // Update the state on the main thread
             DispatchQueue.main.async {
                 self.capturedRoom = importedData.room
-                // Use the new setPathPoints method instead of updatePath
                 self.pathTrackingManager.setPathPoints(importedData.pathPoints)
+                onPathPointsUpdated(importedData.pathPoints)
                 self.scanAttempted = true
                 self.scanState = .preview // Move to preview state after successful import
                 self.isImporting = false
@@ -462,6 +467,9 @@ struct RoomScannerRepresentable: UIViewControllerRepresentable {
 struct RoomPreviewView: UIViewRepresentable {
     let capturedRoom: CapturedRoom
     let pathPoints: [PathPoint]
+    let visualElements: [SCNNode]
+    let recommendedObjectIndex: Int?
+    let candidateObjectIndices: [Int]
     
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
@@ -500,11 +508,46 @@ struct RoomPreviewView: UIViewRepresentable {
         cameraNode.position = SCNVector3(x: 0, y: 2, z: 5)
         scnView.scene?.rootNode.addChildNode(cameraNode)
         
+        // Add path points
+        if pathPoints.count > 1 {
+            let first = pathPoints.first!
+            let last = pathPoints.last!
+            let startSphere = SCNSphere(radius: 0.08)
+            startSphere.firstMaterial?.diffuse.contents = UIColor.systemGreen
+            let startNode = SCNNode(geometry: startSphere)
+            startNode.position = SCNVector3(first.position.x, first.position.y + 0.07, first.position.z)
+            scnView.scene?.rootNode.addChildNode(startNode)
+
+            let endSphere = SCNSphere(radius: 0.08)
+            endSphere.firstMaterial?.diffuse.contents = UIColor.systemRed
+            let endNode = SCNNode(geometry: endSphere)
+            endNode.position = SCNVector3(last.position.x, last.position.y + 0.07, last.position.z)
+            scnView.scene?.rootNode.addChildNode(endNode)
+        }
+        
+        // Add visual elements
+        for element in visualElements {
+            scnView.scene?.rootNode.addChildNode(element)
+        }
+        
         return scnView
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
+        // Remove old path points and visual elements
+        for node in uiView.scene?.rootNode.childNodes ?? [] {
+            if node.geometry is SCNSphere || node.geometry is SCNPlane {
+                node.removeFromParentNode()
+            }
+        }
+        
+        // Update scene
         uiView.scene = createScene(from: capturedRoom)
+        
+        // Add visual elements
+        for element in visualElements {
+            uiView.scene?.rootNode.addChildNode(element)
+        }
     }
     
     private func createScene(from room: CapturedRoom) -> SCNScene {
@@ -641,13 +684,15 @@ struct RoomPreviewView: UIViewRepresentable {
         }
         
         // Add objects with offset and labels
-        for object in room.objects {
+        let visualizer = RecommendationVisualizer()
+        for (index, object) in room.objects.enumerated() {
             let geometry = SCNBox(width: CGFloat(object.dimensions.x),
                                 height: CGFloat(object.dimensions.y),
                                 length: CGFloat(object.dimensions.z),
                                 chamferRadius: 0)
             geometry.firstMaterial?.diffuse.contents = UIColor.systemGreen.withAlphaComponent(0.6)
             let node = SCNNode(geometry: geometry)
+            node.name = "object_\(index)"
             
             // Calculate offset based on transform
             let transform = object.transform
@@ -658,6 +703,14 @@ struct RoomPreviewView: UIViewRepresentable {
             newTransform.columns.3.z += offset.z
             
             node.simdTransform = newTransform
+            // Highlight top face if this is a candidate object
+            if candidateObjectIndices.contains(index) {
+                visualizer.highlightTopFace(of: node, color: UIColor.purple)
+            }
+            // Highlight top face if this is the recommended object (overrides candidate color)
+            if let recIdx = recommendedObjectIndex, index == recIdx {
+                visualizer.highlightTopFace(of: node, color: UIColor.red)
+            }
             scene.rootNode.addChildNode(node)
             
             // Add text label for the object
@@ -693,16 +746,38 @@ struct RoomPreviewView: UIViewRepresentable {
         
         // Add camera path visualization
         if pathPoints.count > 1 {
+            // Add start and end nodes
+            let startSphere = SCNSphere(radius: 0.08)
+            startSphere.firstMaterial?.diffuse.contents = UIColor.systemGreen
+            let startNode = SCNNode(geometry: startSphere)
+            startNode.position = SCNVector3(
+                x: Float(pathPoints.first!.position.x),
+                y: Float(pathPoints.first!.position.y) + 0.07,
+                z: Float(pathPoints.first!.position.z)
+            )
+            scene.rootNode.addChildNode(startNode)
+
+            let endSphere = SCNSphere(radius: 0.08)
+            endSphere.firstMaterial?.diffuse.contents = UIColor.systemRed
+            let endNode = SCNNode(geometry: endSphere)
+            endNode.position = SCNVector3(
+                x: Float(pathPoints.last!.position.x),
+                y: Float(pathPoints.last!.position.y) + 0.07,
+                z: Float(pathPoints.last!.position.z)
+            )
+            scene.rootNode.addChildNode(endNode)
+
             var vertices: [SCNVector3] = []
             for point in pathPoints {
                 let position = SCNVector3(
                     x: Float(point.position.x),
-                    y: Float(point.position.y) + 0.1,
+                    y: Float(point.position.y) + 0.1, // Slight offset to avoid z-fighting
                     z: Float(point.position.z)
                 )
                 vertices.append(position)
             }
-            // Draw tubes (cylinders) between consecutive points using quaternions for robust alignment
+            
+            // Draw tubes between consecutive points
             for i in 0..<(vertices.count - 1) {
                 let start = vertices[i]
                 let end = vertices[i + 1]
@@ -727,10 +802,8 @@ struct RoomPreviewView: UIViewRepresentable {
                 let vUnit = SCNVector3(v.x / vNorm, v.y / vNorm, v.z / vNorm)
                 let dot = up.x * vUnit.x + up.y * vUnit.y + up.z * vUnit.z
                 if abs(dot - 1.0) < 1e-6 {
-                    // Already aligned
                     cylinderNode.orientation = SCNQuaternion(0, 0, 0, 1)
                 } else if abs(dot + 1.0) < 1e-6 {
-                    // Opposite direction
                     cylinderNode.orientation = SCNQuaternion(1, 0, 0, Float.pi)
                 } else {
                     let axis = SCNVector3(
@@ -753,20 +826,6 @@ struct RoomPreviewView: UIViewRepresentable {
                 }
 
                 scene.rootNode.addChildNode(cylinderNode)
-            }
-            // Add start and end spheres for visibility
-            if let first = vertices.first, let last = vertices.last {
-                let startSphere = SCNSphere(radius: 0.08) // Larger radius
-                startSphere.firstMaterial?.diffuse.contents = UIColor.systemGreen // Green for start
-                let startNode = SCNNode(geometry: startSphere)
-                startNode.position = SCNVector3(first.x, first.y + 0.07, first.z) // Offset above path
-                scene.rootNode.addChildNode(startNode)
-
-                let endSphere = SCNSphere(radius: 0.08)
-                endSphere.firstMaterial?.diffuse.contents = UIColor.systemRed // Red for end
-                let endNode = SCNNode(geometry: endSphere)
-                endNode.position = SCNVector3(last.x, last.y + 0.07, last.z)
-                scene.rootNode.addChildNode(endNode)
             }
         }
         
@@ -1029,6 +1088,7 @@ class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     RoomScannerView(
         capturedRoom: .constant(nil),
         scanAttempted: .constant(false),
-        isRoomPlanSupported: true // or false to preview unsupported UI
+        isRoomPlanSupported: true, // or false to preview unsupported UI
+        onPathPointsUpdated: { _ in }
     )
 }
