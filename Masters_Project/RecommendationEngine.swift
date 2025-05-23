@@ -19,8 +19,15 @@ struct RecommendationSettings {
     // Validate weights sum to 1.0
     mutating func normalizeWeights() {
         let total = pathWeight + furnitureWeight
-        pathWeight = pathWeight / total
-        furnitureWeight = furnitureWeight / total
+        if total > 0.00001 { // Use a small epsilon for float comparison, or just > 0 if confident inputs are non-negative.
+            pathWeight = pathWeight / total
+            furnitureWeight = furnitureWeight / total
+        } else {
+            // If total is zero (e.g., both pathWeight and furnitureWeight are 0),
+            // default to 50/50 to avoid division by zero and ensure valid scores.
+            pathWeight = 0.5
+            furnitureWeight = 0.5
+        }
     }
 }
 
