@@ -69,62 +69,6 @@ struct HabitRecommendationView: View {
                     .padding(.bottom)
                 }
                 
-                // Weight Adjustment Sliders
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Adjust Recommendation Weights")
-                        .font(.headline)
-                    
-                    VStack(alignment: .leading) {
-                        Text("Camera Path Weight: \(Int(pathWeight * 100))%")
-                        Slider(value: $pathWeight, in: 0...1)
-                            .onChange(of: pathWeight, initial: false) {
-                                if hasGeneratedRecommendation {
-                                    updateRecommendation()
-                                }
-                            }
-                    }
-                    
-                    VStack(alignment: .leading) {
-                        Text("Furniture Weight: \(Int(furnitureWeight * 100))%")
-                        Slider(value: $furnitureWeight, in: 0...1)
-                            .onChange(of: furnitureWeight, initial: false) {
-                                if hasGeneratedRecommendation {
-                                    updateRecommendation()
-                                }
-                            }
-                    }
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-                
-                // Generate Button
-                if !hasGeneratedRecommendation {
-                    Button(action: {
-                        hasGeneratedRecommendation = true
-                        updateRecommendation()
-                    }) {
-                        HStack {
-                            Image(systemName: "wand.and.stars")
-                            Text("Generate Recommendation")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                }
-                
-                // Error Message
-                if let error = errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                
                 // Room Preview
                 if let room = roomData {
                     Text("Room Preview")
@@ -153,11 +97,55 @@ struct HabitRecommendationView: View {
                     Text("No room scan available")
                         .foregroundColor(.gray)
                 }
+                
+                // Error Message
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
+                }
+                
+                // Weight Adjustment Sliders
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Adjust Recommendation Weights")
+                        .font(.headline)
+                    
+                    VStack(alignment: .leading) {
+                        Text("Camera Path Weight: \(Int(pathWeight * 100))%")
+                        Slider(value: $pathWeight, in: 0...1)
+                            .onChange(of: pathWeight, initial: false) {
+                                if hasGeneratedRecommendation {
+                                    updateRecommendation()
+                                }
+                            }
+                    }
+                    
+                    VStack(alignment: .leading) {
+                        Text("Furniture Weight: \(Int(furnitureWeight * 100))%")
+                        Slider(value: $furnitureWeight, in: 0...1)
+                            .onChange(of: furnitureWeight, initial: false) {
+                                if hasGeneratedRecommendation {
+                                    updateRecommendation()
+                                }
+                            }
+                    }
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
             }
             .padding()
         }
         .navigationTitle("Placement Guide")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if !hasGeneratedRecommendation {
+                hasGeneratedRecommendation = true
+                updateRecommendation()
+            }
+        }
     }
     
     private func updateRecommendation() {
