@@ -321,11 +321,16 @@ struct RoomScannerView: View {
         // Create and store the delegate
         let delegate = ImportDocumentPickerDelegate(
             onImport: { url in
-                self.handleImportedFile(at: url)
+                // Add a small delay to ensure document picker is properly dismissed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.handleImportedFile(at: url)
+                }
             },
             onError: { error in
-                self.importError = error
-                self.showImportError = true
+                DispatchQueue.main.async {
+                    self.importError = error
+                    self.showImportError = true
+                }
             }
         )
         
@@ -336,15 +341,22 @@ struct RoomScannerView: View {
         let jsonType = UTType.json
         let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [jsonType])
         documentPicker.delegate = delegate
+        documentPicker.modalPresentationStyle = .pageSheet // More reliable presentation style
         
-        // Get the current window scene
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootViewController = window.rootViewController {
-            // Present the picker on the main thread
+        // Get the current window scene and present more safely
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first,
+              let rootViewController = window.rootViewController else {
             DispatchQueue.main.async {
-                rootViewController.present(documentPicker, animated: true)
+                self.importError = "Unable to present file picker"
+                self.showImportError = true
             }
+            return
+        }
+        
+        // Present the picker on the main thread
+        DispatchQueue.main.async {
+            rootViewController.present(documentPicker, animated: true)
         }
     }
     
@@ -354,45 +366,62 @@ struct RoomScannerView: View {
             self.isImporting = true
         }
         
-        do {
-            // Read the file data
-            let data = try Data(contentsOf: url)
-            
-            // Validate that we have data
-            guard !data.isEmpty else {
-                throw ImportError.emptyFile
-            }
-            
-            // Try to decode the JSON
-            let decoder = JSONDecoder()
-            let importedData = try decoder.decode(RoomExportData.self, from: data)
-            
-            // Validate the imported room has basic required elements
-            guard !importedData.room.walls.isEmpty else {
-                throw ImportError.invalidRoomData("No walls found in the imported room")
-            }
-            
-            // Update the state on the main thread
-            DispatchQueue.main.async {
-                self.capturedRoom = importedData.room
-                self.pathTrackingManager.setPathPoints(importedData.pathPoints)
-                onPathPointsUpdated(importedData.pathPoints)
-                self.scanAttempted = true
-                self.scanState = .preview // Move to preview state after successful import
-                self.isImporting = false
-            }
-            
-        } catch let error as ImportError {
-            DispatchQueue.main.async {
-                self.importError = error.localizedDescription
-                self.showImportError = true
-                self.isImporting = false
-            }
-        } catch {
-            DispatchQueue.main.async {
-                self.importError = "Failed to import file: \(error.localizedDescription)"
-                self.showImportError = true
-                self.isImporting = false
+        // Perform file operations on background queue
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                // Ensure we have access to the file
+                guard url.startAccessingSecurityScopedResource() else {
+                    throw ImportError.invalidRoomData("Cannot access file")
+                }
+                
+                defer {
+                    url.stopAccessingSecurityScopedResource()
+                }
+                
+                // Read the file data
+                let data = try Data(contentsOf: url)
+                
+                // Validate that we have data
+                guard !data.isEmpty else {
+                    throw ImportError.emptyFile
+                }
+                
+                // Try to decode the JSON
+                let decoder = JSONDecoder()
+                let importedData = try decoder.decode(RoomExportData.self, from: data)
+                
+                // Validate the imported room has basic required elements
+                guard !importedData.room.walls.isEmpty else {
+                    throw ImportError.invalidRoomData("No walls found in the imported room")
+                }
+                
+                // Update the state on the main thread
+                DispatchQueue.main.async {
+                    self.capturedRoom = importedData.room
+                    self.pathTrackingManager.setPathPoints(importedData.pathPoints)
+                    self.onPathPointsUpdated(importedData.pathPoints)
+                    self.scanAttempted = true
+                    self.scanState = .preview // Move to preview state after successful import
+                    self.isImporting = false
+                    
+                    // Clear the delegate reference after successful import
+                    self.documentPickerDelegate = nil
+                }
+                
+            } catch let error as ImportError {
+                DispatchQueue.main.async {
+                    self.importError = error.localizedDescription
+                    self.showImportError = true
+                    self.isImporting = false
+                    self.documentPickerDelegate = nil
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.importError = "Failed to import file: \(error.localizedDescription)"
+                    self.showImportError = true
+                    self.isImporting = false
+                    self.documentPickerDelegate = nil
+                }
             }
         }
     }
@@ -1061,26 +1090,18 @@ class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
             return
         }
         
-        // Start accessing the security-scoped resource
-        guard url.startAccessingSecurityScopedResource() else {
-            onError("Permission denied to access the file")
+        // Validate file extension
+        guard url.pathExtension.lowercased() == "json" else {
+            onError("Please select a JSON file")
             return
-        }
-        
-        defer {
-            url.stopAccessingSecurityScopedResource()
         }
         
         onImport(url)
     }
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        // Handle cancellation if needed
-    }
-    
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
-        // This is the correct method name, but we're already handling it in didPickDocumentsAt
-        // So we can leave this empty or remove it
+        // Cancellation is normal behavior, don't treat as error
+        print("Document picker was cancelled by user")
     }
 }
 

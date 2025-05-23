@@ -46,6 +46,29 @@ struct HabitRecommendationView: View {
                 Text(habit.description)
                     .font(.body)
                 
+                // Associated Furniture Types
+                if !habit.associatedFurnitureTypes.isEmpty {
+                    VStack(alignment: .leading) {
+                        Text("Associated Furniture")
+                            .font(.headline)
+                            .padding(.bottom, 2)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(habit.associatedFurnitureTypes, id: \.self) { furnitureType in
+                                    Text(String(describing: furnitureType).capitalized)
+                                        .font(.callout)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+                        }
+                    }
+                    .padding(.bottom)
+                }
+                
                 // Weight Adjustment Sliders
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Adjust Recommendation Weights")
@@ -208,16 +231,17 @@ struct HabitRecommendationView: View {
         // Log recommendation details and draw connection lines
         if let recommendation = recommendation {
             print("[Recommended Surface] Index: \(recommendation.objectIndex), Score: \(recommendation.score), DistanceFromPath: \(recommendation.distanceFromPath), DistanceFromFurniture: \(recommendation.distanceFromFurniture)")
-            let pathLines = visualizer.createPathLines(
-                from: pathPoints,
-                to: recommendation.surface
-            )
-            visualElements.append(contentsOf: pathLines)
-            let furnitureLines = visualizer.createFurnitureLines(
-                from: furniture,
-                to: recommendation.surface
-            )
-            visualElements.append(contentsOf: furnitureLines)
+            // Removed line drawing to reduce visual clutter
+            // let pathLines = visualizer.createPathLines(
+            //     from: pathPoints,
+            //     to: recommendation.surface
+            // )
+            // visualElements.append(contentsOf: pathLines)
+            // let furnitureLines = visualizer.createFurnitureLines(
+            //     from: furniture,
+            //     to: recommendation.surface
+            // )
+            // visualElements.append(contentsOf: furnitureLines)
         }
         
         // Log associated furniture

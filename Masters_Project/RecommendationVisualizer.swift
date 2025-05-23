@@ -84,7 +84,7 @@ class RecommendationVisualizer {
         
         let source = SCNGeometrySource(vertices: vertices)
         let element = SCNGeometryElement(
-            indices: [0, 1],
+            indices: [0, 1] as [UInt16],
             primitiveType: .line
         )
         
