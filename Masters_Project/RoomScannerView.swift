@@ -714,6 +714,8 @@ struct RoomPreviewView: UIViewRepresentable {
         
         // Add objects with offset and labels
         let visualizer = RecommendationVisualizer()
+        var categoryCounts: [CapturedRoom.Object.Category: Int] = [:]
+        
         for (index, object) in room.objects.enumerated() {
             let geometry = SCNBox(width: CGFloat(object.dimensions.x),
                                 height: CGFloat(object.dimensions.y),
@@ -742,8 +744,17 @@ struct RoomPreviewView: UIViewRepresentable {
             }
             scene.rootNode.addChildNode(node)
             
-            // Add text label for the object
-            let labelText = String(describing: object.category)
+            // Track category counts and create appropriate label
+            let currentCount = categoryCounts[object.category, default: 0]
+            categoryCounts[object.category] = currentCount + 1
+            
+            let labelText: String
+            if currentCount == 0 {
+                labelText = String(describing: object.category).capitalized
+            } else {
+                labelText = "\(String(describing: object.category).capitalized) (\(currentCount))"
+            }
+            
             let textGeometry = SCNText(string: labelText, extrusionDepth: 0.01)
             textGeometry.font = UIFont.systemFont(ofSize: 0.22)
             textGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray

@@ -15,6 +15,7 @@ struct Habit: Identifiable {
     let associatedObject: String
     let iconName: String
     var associatedFurnitureTypes: [CapturedRoom.Object.Category]
+    var associatedFurnitureIndices: [Int] = []
 }
 
 // Sample data
@@ -26,7 +27,8 @@ extension Habit {
             category: .activity,
             associatedObject: "Water Bottle",
             iconName: "drop.fill",
-            associatedFurnitureTypes: [.bed, .chair, .sofa]
+            associatedFurnitureTypes: [.bed, .chair, .sofa],
+            associatedFurnitureIndices: []
         ),
         Habit(
             name: "Take Regular Breaks",
@@ -34,7 +36,8 @@ extension Habit {
             category: .activity,
             associatedObject: "Timer",
             iconName: "timer",
-            associatedFurnitureTypes: [.chair, .sofa]
+            associatedFurnitureTypes: [.chair, .sofa],
+            associatedFurnitureIndices: []
         ),
         Habit(
             name: "Healthy Snacks",
@@ -42,7 +45,8 @@ extension Habit {
             category: .diet,
             associatedObject: "Snack Container",
             iconName: "leaf.fill",
-            associatedFurnitureTypes: [.oven]
+            associatedFurnitureTypes: [.oven],
+            associatedFurnitureIndices: []
         ),
         Habit(
             name: "Sleep Schedule",
@@ -50,7 +54,8 @@ extension Habit {
             category: .sleep,
             associatedObject: "Phone Charger",
             iconName: "moon.fill",
-            associatedFurnitureTypes: [.bed]
+            associatedFurnitureTypes: [.bed],
+            associatedFurnitureIndices: []
         )
     ]
 } 

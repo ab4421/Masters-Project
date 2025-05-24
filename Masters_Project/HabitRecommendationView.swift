@@ -17,6 +17,7 @@ struct HabitRecommendationView: View {
     @State private var candidateIndices: [Int] = []
     @State private var recommendedGlobalIndex: Int? = nil
     @State private var isEditingFurniture: Bool = false
+    @State private var displayedFurnitureNamesList: [String] = []
     
     private let recommendationEngine = RecommendationEngine()
     private let visualizer = RecommendationVisualizer()
@@ -48,7 +49,7 @@ struct HabitRecommendationView: View {
                     .font(.body)
                 
                 // Associated Furniture Types
-                if !habit.associatedFurnitureTypes.isEmpty {
+                if !habit.associatedFurnitureTypes.isEmpty || !habit.associatedFurnitureIndices.isEmpty {
                     VStack(alignment: .leading) {
                         Text("Associated Furniture")
                             .font(.headline)
@@ -56,8 +57,9 @@ struct HabitRecommendationView: View {
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
-                                ForEach(habit.associatedFurnitureTypes, id: \.self) { furnitureType in
-                                    Text(String(describing: furnitureType).capitalized)
+                                ForEach(displayedFurnitureNamesList.indices, id: \.self) { index in
+                                    let displayText = displayedFurnitureNamesList[index]
+                                    Text(displayText)
                                         .font(.callout)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
@@ -153,6 +155,7 @@ struct HabitRecommendationView: View {
                 FurnitureEditView(
                     isPresented: $isEditingFurniture,
                     associatedFurnitureTypes: $habit.associatedFurnitureTypes,
+                    associatedFurnitureIndices: $habit.associatedFurnitureIndices,
                     allDetectedObjects: room.objects
                 )
             } else {
@@ -163,12 +166,45 @@ struct HabitRecommendationView: View {
             if hasGeneratedRecommendation {
                 updateRecommendation()
             }
+            updateDisplayedFurnitureList()
+        }
+        .onChange(of: habit.associatedFurnitureIndices) {
+            if hasGeneratedRecommendation {
+                updateRecommendation()
+            }
+            updateDisplayedFurnitureList()
         }
         .onAppear {
+            updateDisplayedFurnitureList()
             if !hasGeneratedRecommendation {
                 hasGeneratedRecommendation = true
                 updateRecommendation()
             }
+        }
+    }
+    
+    private func updateDisplayedFurnitureList() {
+        if !habit.associatedFurnitureIndices.isEmpty, let room = roomData {
+            var categoryCounts: [CapturedRoom.Object.Category: Int] = [:]
+            var items: [String] = []
+            
+            for index in habit.associatedFurnitureIndices.sorted() {
+                guard index < room.objects.count else { continue }
+                let object = room.objects[index]
+                let currentCount = categoryCounts[object.category, default: 0]
+                categoryCounts[object.category] = currentCount + 1
+                
+                let displayText: String
+                if currentCount == 0 {
+                    displayText = String(describing: object.category).capitalized
+                } else {
+                    displayText = "\(String(describing: object.category).capitalized) \(currentCount + 1)"
+                }
+                items.append(displayText)
+            }
+            self.displayedFurnitureNamesList = items
+        } else {
+            self.displayedFurnitureNamesList = habit.associatedFurnitureTypes.map { String(describing: $0).capitalized }
         }
     }
     
@@ -328,12 +364,22 @@ struct HabitRecommendationView: View {
         var furniture: [SCNNode] = []
         print("\n=== Associated Furniture Detection Debug ===")
         print("Total objects in room: \(room.objects.count)")
-        for (index, object) in room.objects.enumerated() {
-            print("\nObject \(index + 1):")
-            print("Category: \(object.category)")
-            print("Dimensions: x=\(object.dimensions.x), y=\(object.dimensions.y), z=\(object.dimensions.z)")
-            if habit.associatedFurnitureTypes.contains(object.category) {
-                print("✓ Identified as associated furniture")
+        
+        // Use individual object indices if available, otherwise fall back to categories
+        if !habit.associatedFurnitureIndices.isEmpty {
+            print("Using individual object indices: \(habit.associatedFurnitureIndices)")
+            for index in habit.associatedFurnitureIndices {
+                guard index < room.objects.count else {
+                    print("⚠️ Object index \(index) out of range (max: \(room.objects.count - 1))")
+                    continue
+                }
+                
+                let object = room.objects[index]
+                print("\nObject \(index + 1) (selected):")
+                print("Category: \(object.category)")
+                print("Dimensions: x=\(object.dimensions.x), y=\(object.dimensions.y), z=\(object.dimensions.z)")
+                print("✓ Added as associated furniture")
+                
                 let geometry = SCNBox(
                     width: CGFloat(object.dimensions.x),
                     height: CGFloat(object.dimensions.y),
@@ -343,10 +389,30 @@ struct HabitRecommendationView: View {
                 let node = SCNNode(geometry: geometry)
                 node.simdTransform = object.transform
                 furniture.append(node)
-            } else {
-                print("✗ Not identified as associated furniture")
+            }
+        } else {
+            print("Using category-based selection: \(habit.associatedFurnitureTypes)")
+            for (index, object) in room.objects.enumerated() {
+                print("\nObject \(index + 1):")
+                print("Category: \(object.category)")
+                print("Dimensions: x=\(object.dimensions.x), y=\(object.dimensions.y), z=\(object.dimensions.z)")
+                if habit.associatedFurnitureTypes.contains(object.category) {
+                    print("✓ Identified as associated furniture")
+                    let geometry = SCNBox(
+                        width: CGFloat(object.dimensions.x),
+                        height: CGFloat(object.dimensions.y),
+                        length: CGFloat(object.dimensions.z),
+                        chamferRadius: 0
+                    )
+                    let node = SCNNode(geometry: geometry)
+                    node.simdTransform = object.transform
+                    furniture.append(node)
+                } else {
+                    print("✗ Not identified as associated furniture")
+                }
             }
         }
+        
         print("\nTotal associated furniture items found: \(furniture.count)")
         print("=== End Associated Furniture Detection ===\n")
         return furniture
