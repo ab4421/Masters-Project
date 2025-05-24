@@ -14,7 +14,7 @@ struct Habit: Identifiable {
     let category: HabitCategory
     let associatedObject: String
     let iconName: String
-    let associatedFurnitureTypes: [CapturedRoom.Object.Category]
+    var associatedFurnitureTypes: [CapturedRoom.Object.Category]
 }
 
 // Sample data

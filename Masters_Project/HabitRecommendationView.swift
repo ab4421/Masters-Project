@@ -3,7 +3,7 @@ import RoomPlan
 import SceneKit
 
 struct HabitRecommendationView: View {
-    let habit: Habit
+    @State var habit: Habit
     let roomData: CapturedRoom?
     let pathPoints: [PathPoint]
     
@@ -16,6 +16,7 @@ struct HabitRecommendationView: View {
     @State private var hasGeneratedRecommendation: Bool = false
     @State private var candidateIndices: [Int] = []
     @State private var recommendedGlobalIndex: Int? = nil
+    @State private var isEditingFurniture: Bool = false
     
     private let recommendationEngine = RecommendationEngine()
     private let visualizer = RecommendationVisualizer()
@@ -140,6 +141,29 @@ struct HabitRecommendationView: View {
         }
         .navigationTitle("Placement Guide")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Edit") {
+                    isEditingFurniture = true
+                }
+            }
+        }
+        .sheet(isPresented: $isEditingFurniture) {
+            if let room = roomData {
+                FurnitureEditView(
+                    isPresented: $isEditingFurniture,
+                    associatedFurnitureTypes: $habit.associatedFurnitureTypes,
+                    allDetectedObjects: room.objects
+                )
+            } else {
+                Text("Room data is not available to edit furniture.")
+            }
+        }
+        .onChange(of: habit.associatedFurnitureTypes) {
+            if hasGeneratedRecommendation {
+                updateRecommendation()
+            }
+        }
         .onAppear {
             if !hasGeneratedRecommendation {
                 hasGeneratedRecommendation = true
