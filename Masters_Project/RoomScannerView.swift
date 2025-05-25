@@ -716,6 +716,12 @@ struct RoomPreviewView: UIViewRepresentable {
         let visualizer = RecommendationVisualizer()
         var categoryCounts: [CapturedRoom.Object.Category: Int] = [:]
         
+        // First pass: count objects by category to determine if numbering is needed
+        var categoryTotals: [CapturedRoom.Object.Category: Int] = [:]
+        for object in room.objects {
+            categoryTotals[object.category, default: 0] += 1
+        }
+        
         for (index, object) in room.objects.enumerated() {
             let geometry = SCNBox(width: CGFloat(object.dimensions.x),
                                 height: CGFloat(object.dimensions.y),
@@ -744,15 +750,16 @@ struct RoomPreviewView: UIViewRepresentable {
             }
             scene.rootNode.addChildNode(node)
             
-            // Track category counts and create appropriate label
+            // Track category counts and create appropriate label using FurnitureEditView logic
             let currentCount = categoryCounts[object.category, default: 0]
             categoryCounts[object.category] = currentCount + 1
             
             let labelText: String
-            if currentCount == 0 {
-                labelText = String(describing: object.category).capitalized
+            let totalForCategory = categoryTotals[object.category, default: 1]
+            if totalForCategory > 1 {
+                labelText = "\(String(describing: object.category).capitalized) \(currentCount + 1)"
             } else {
-                labelText = "\(String(describing: object.category).capitalized) (\(currentCount))"
+                labelText = String(describing: object.category).capitalized
             }
             
             let textGeometry = SCNText(string: labelText, extrusionDepth: 0.01)

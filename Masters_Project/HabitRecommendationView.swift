@@ -188,6 +188,14 @@ struct HabitRecommendationView: View {
             var categoryCounts: [CapturedRoom.Object.Category: Int] = [:]
             var items: [String] = []
             
+            // First pass: count total objects by category to determine if numbering is needed
+            var categoryTotals: [CapturedRoom.Object.Category: Int] = [:]
+            for index in habit.associatedFurnitureIndices {
+                guard index < room.objects.count else { continue }
+                let object = room.objects[index]
+                categoryTotals[object.category, default: 0] += 1
+            }
+            
             for index in habit.associatedFurnitureIndices.sorted() {
                 guard index < room.objects.count else { continue }
                 let object = room.objects[index]
@@ -195,10 +203,11 @@ struct HabitRecommendationView: View {
                 categoryCounts[object.category] = currentCount + 1
                 
                 let displayText: String
-                if currentCount == 0 {
-                    displayText = String(describing: object.category).capitalized
-                } else {
+                let totalForCategory = categoryTotals[object.category, default: 1]
+                if totalForCategory > 1 {
                     displayText = "\(String(describing: object.category).capitalized) \(currentCount + 1)"
+                } else {
+                    displayText = String(describing: object.category).capitalized
                 }
                 items.append(displayText)
             }
