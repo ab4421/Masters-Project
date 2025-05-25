@@ -21,40 +21,63 @@ struct Habit: Identifiable {
 // Sample data
 extension Habit {
     static let sampleHabits: [Habit] = [
+        // Diet & Hydration Habits
         Habit(
-            name: "Drink More Water",
-            description: "Place your water bottle in the red highlighted surface below in your room. Staying hydrated boosts your energy and focus!",
-            category: .activity,
+            name: "Consistent Hydration",
+            description: "Place your water bottle in the red highlighted surface below within easy reach. Constant visual reminders and easy access make staying hydrated effortless throughout the day!",
+            category: .diet,
             associatedObject: "Water Bottle",
             iconName: "drop.fill",
-            associatedFurnitureTypes: [.bed, .chair, .sofa],
+            associatedFurnitureTypes: [.bed, .sofa, .chair],
             associatedFurnitureIndices: []
         ),
         Habit(
-            name: "Take Regular Breaks",
-            description: "Set a timer in the red highlighted surface below to remind yourself to take breaks. Regular breaks help you stay productive and reduce stress!",
-            category: .activity,
-            associatedObject: "Timer",
-            iconName: "timer",
-            associatedFurnitureTypes: [.chair, .sofa],
-            associatedFurnitureIndices: []
-        ),
-        Habit(
-            name: "Healthy Snacks",
-            description: "Get a container of healthy fruits and place it in the red highlighted surface below. Nutritious snacks keep your mind sharp and your body fueled!",
+            name: "Healthy Snacking",
+            description: "Position your fruit bowl in the red highlighted surface below in your kitchen area. Making healthy options the most visible choice encourages better eating habits!",
             category: .diet,
-            associatedObject: "Snack Container",
+            associatedObject: "Fruit Bowl",
             iconName: "leaf.fill",
-            associatedFurnitureTypes: [.oven],
+            associatedFurnitureTypes: [.refrigerator, .oven],
+            associatedFurnitureIndices: []
+        ),
+        
+        // Physical Activity Habits
+        Habit(
+            name: "Daily Movement Cue",
+            description: "Keep your yoga block or resistance band set in the red highlighted surface below where you relax. Having them visible reminds you to take movement breaks!",
+            category: .activity,
+            associatedObject: "Yoga Block Set",
+            iconName: "figure.yoga",
+            associatedFurnitureTypes: [.television, .sofa],
             associatedFurnitureIndices: []
         ),
         Habit(
-            name: "Sleep Schedule",
-            description: "Put your phone charger in the red highlighted surface below, away from your bed. This helps you avoid late-night screen time and improves your sleep quality!",
+            name: "Quick Activity Prep",
+            description: "Place your outdoor essentials tray in the red highlighted surface below near your exit. Having keys, sunglasses, and earbuds ready makes leaving for activities effortless!",
+            category: .activity,
+            associatedObject: "Essentials Tray",
+            iconName: "tray.fill",
+            associatedFurnitureTypes: [.storage, .fireplace],
+            associatedFurnitureIndices: []
+        ),
+        
+        // Sleep Hygiene Habits
+        Habit(
+            name: "Tech-Free Reading",
+            description: "Keep your current book in the red highlighted surface below beside your bed. Having it immediately available makes choosing reading over screen time much easier before sleep!",
             category: .sleep,
-            associatedObject: "Phone Charger",
-            iconName: "moon.fill",
-            associatedFurnitureTypes: [.bed],
+            associatedObject: "Physical Book",
+            iconName: "book.fill",
+            associatedFurnitureTypes: [.bed, .storage],
+            associatedFurnitureIndices: []
+        ),
+        Habit(
+            name: "Calming Bedtime Tea",
+            description: "Set up your herbal tea canister and favorite mug in the red highlighted surface below near your kitchen water source. Having everything ready makes preparing a calming bedtime routine effortless!",
+            category: .sleep,
+            associatedObject: "Tea Set",
+            iconName: "cup.and.saucer.fill",
+            associatedFurnitureTypes: [.sink, .stove],
             associatedFurnitureIndices: []
         )
     ]
