@@ -80,11 +80,10 @@ struct ContentView: View {
             .tag(3)
 
             NavigationView {
-                Text("Settings (Placeholder)")
-                    .navigationTitle("Settings")
+                AboutView()
             }
             .tabItem {
-                Label("Settings", systemImage: "gear")
+                Label("About", systemImage: "info.circle")
             }
             .tag(4)
         }
