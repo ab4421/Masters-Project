@@ -311,7 +311,7 @@ struct AboutView: View {
                             Text("Arnav Bhatia")
                                 .font(.subheadline)
                                 .bold()
-                            Text("arnav.bhatia@example.com")
+                            Text("arnav.bhatia21@imperial.ac.uk")
                                 .font(.subheadline)
                                 .foregroundColor(.blue)
                         }
