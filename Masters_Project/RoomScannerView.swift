@@ -130,6 +130,7 @@ struct RoomScannerView: View {
     @Binding var scanAttempted: Bool
     let isRoomPlanSupported: Bool
     let onPathPointsUpdated: ([PathPoint]) -> Void
+    let onRoomDataLoaded: (() -> Void)? // Add callback for when new room data is loaded
     
     @State private var scanState: ScanState = .intro
     @State private var isImporting: Bool = false
@@ -139,89 +140,112 @@ struct RoomScannerView: View {
     @State var pathTrackingManager = PathTrackingManager()
 
     var body: some View {
-        switch scanState {
-        case .intro:
-            VStack(spacing: 32) {
-                Spacer()
-                Text("RoomPlan")
-                    .font(.largeTitle).bold()
-                if isRoomPlanSupported {
-                    Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.")
-                        .multilineTextAlignment(.center)
-                        .font(.body)
-                } else {
-                    Text("Your phone does not support scanning, but you can import a scan.")
-                        .multilineTextAlignment(.center)
-                        .font(.body)
-                        .foregroundColor(.orange)
-                }
-                Spacer()
-                HStack(spacing: 20) {
-                    Button(action: { scanState = .scanning }) {
-                        Text("Start Scanning")
+        Group {
+            switch scanState {
+            case .intro:
+                VStack(spacing: 32) {
+                    Spacer()
+                    Text("RoomPlan")
+                        .font(.largeTitle).bold()
+                    if isRoomPlanSupported {
+                        Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.\n\n💡 Tip: After scanning, use the Export button to save your scan for future use. You can then import it later to avoid re-scanning.")
+                            .multilineTextAlignment(.center)
+                            .font(.body)
+                    } else {
+                        Text("Your phone does not support scanning, but you can import a previously saved scan.\n\n💡 Tip: If you have exported scans from other devices, you can import them here.")
+                            .multilineTextAlignment(.center)
+                            .font(.body)
+                            .foregroundColor(.orange)
+                    }
+                    Spacer()
+                    HStack(spacing: 20) {
+                        Button(action: { scanState = .scanning }) {
+                            Text("Start Scanning")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(isRoomPlanSupported ? Color.blue : Color.gray)
+                                .cornerRadius(20)
+                        }
+                        .disabled(!isRoomPlanSupported)
+                        
+                        Button(action: { importRoomData() }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("Import")
+                            }
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(isRoomPlanSupported ? Color.blue : Color.gray)
+                            .background(Color.blue)
                             .cornerRadius(20)
-                    }
-                    .disabled(!isRoomPlanSupported)
-                    
-                    Button(action: { importRoomData() }) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.down")
-                            Text("Import")
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(20)
                     }
+                    .padding(.horizontal, 40)
+                    Spacer(minLength: 32)
                 }
-                .padding(.horizontal, 40)
-                Spacer(minLength: 32)
-            }
-        case .scanning:
-            RoomScannerRepresentable(
-                capturedRoom: $capturedRoom,
-                scanAttempted: $scanAttempted,
-                pathTrackingManager: pathTrackingManager,
-                onCancel: {
-                    scanState = .intro
-                    capturedRoom = nil
-                    pathTrackingManager.clearPath()
-                },
-                onDone: {
-                    scanState = .preview
-                }
-            )
-            .edgesIgnoringSafeArea(.all)
-        case .preview:
-            VStack {
-                Text("Scan Preview")
-                    .font(.title2).bold()
-                    .padding(.top)
-                if let room = capturedRoom {
-                    RoomPreviewView(
-                        capturedRoom: room,
-                        pathPoints: pathTrackingManager.getPathPoints(),
-                        visualElements: [],
-                        recommendedObjectIndex: nil,
-                        candidateObjectIndices: []
-                    )
-                    .frame(height: 350)
-                    .padding()
+            case .scanning:
+                RoomScannerRepresentable(
+                    capturedRoom: $capturedRoom,
+                    scanAttempted: $scanAttempted,
+                    pathTrackingManager: pathTrackingManager,
+                    onCancel: {
+                        scanState = .intro
+                        capturedRoom = nil
+                        pathTrackingManager.clearPath()
+                    },
+                    onDone: {
+                        scanState = .preview
+                    },
+                    onRoomDataLoaded: onRoomDataLoaded
+                )
+                .edgesIgnoringSafeArea(.all)
+            case .preview:
+                VStack {
+                    Text("Scan Preview")
+                        .font(.title2).bold()
+                        .padding(.top)
+                    if let room = capturedRoom {
+                        RoomPreviewView(
+                            capturedRoom: room,
+                            pathPoints: pathTrackingManager.getPathPoints(),
+                            visualElements: [],
+                            recommendedObjectIndex: nil,
+                            candidateObjectIndices: []
+                        )
+                        .frame(height: 350)
+                        .padding()
+                        
+                        // Add export button
+                        Button(action: {
+                            exportRoomData(room: room)
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Export Scan")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(20)
+                            .padding(.horizontal, 40)
+                        }
+                    } else {
+                        Text("No scan data available.")
+                            .foregroundColor(.gray)
+                    }
                     
-                    // Add export button
+                    // Add import button
                     Button(action: {
-                        exportRoomData(room: room)
+                        importRoomData()
                     }) {
                         HStack {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("Export Scan")
+                            Image(systemName: "square.and.arrow.down")
+                            Text("Import Scan")
                         }
                         .font(.headline)
                         .foregroundColor(.white)
@@ -231,47 +255,34 @@ struct RoomScannerView: View {
                         .cornerRadius(20)
                         .padding(.horizontal, 40)
                     }
-                } else {
-                    Text("No scan data available.")
-                        .foregroundColor(.gray)
-                }
-                
-                // Add import button
-                Button(action: {
-                    importRoomData()
-                }) {
-                    HStack {
-                        Image(systemName: "square.and.arrow.down")
-                        Text("Import Scan")
+                    
+                    Button(action: {
+                        scanState = .intro
+                        capturedRoom = nil
+                    }) {
+                        Text("Start New Scan")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(20)
+                            .padding(.horizontal, 40)
                     }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(20)
-                    .padding(.horizontal, 40)
+                    Spacer()
                 }
-                
-                Button(action: {
-                    scanState = .intro
-                    capturedRoom = nil
-                }) {
-                    Text("Start New Scan")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(20)
-                        .padding(.horizontal, 40)
+                .alert("Import Error", isPresented: $showImportError) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(importError)
                 }
-                Spacer()
             }
-            .alert("Import Error", isPresented: $showImportError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(importError)
+        }
+        .onChange(of: capturedRoom == nil) { _, isNil in
+            // Reset to intro state when room data is cleared (becomes nil)
+            if isNil && scanState == .preview {
+                scanState = .intro
+                pathTrackingManager.clearPath()
             }
         }
     }
@@ -404,6 +415,9 @@ struct RoomScannerView: View {
                     self.scanState = .preview // Move to preview state after successful import
                     self.isImporting = false
                     
+                    // Notify that new room data was loaded successfully
+                    self.onRoomDataLoaded?()
+                    
                     // Clear the delegate reference after successful import
                     self.documentPickerDelegate = nil
                 }
@@ -449,6 +463,7 @@ struct RoomScannerRepresentable: UIViewControllerRepresentable {
     var pathTrackingManager: PathTrackingManager
     var onCancel: () -> Void
     var onDone: () -> Void
+    var onRoomDataLoaded: (() -> Void)? // Add callback for room data loaded
 
     func makeUIViewController(context: Context) -> UINavigationController {
         let viewController = RoomCaptureViewControllerSwiftUI()
@@ -479,6 +494,7 @@ struct RoomScannerRepresentable: UIViewControllerRepresentable {
             }
             if let room = room {
                 parent.capturedRoom = room
+                parent.onRoomDataLoaded?() // Notify that new room data was loaded
                 parent.onDone()
             } else {
                 parent.capturedRoom = nil
@@ -1128,6 +1144,7 @@ class ImportDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
         capturedRoom: .constant(nil),
         scanAttempted: .constant(false),
         isRoomPlanSupported: true, // or false to preview unsupported UI
-        onPathPointsUpdated: { _ in }
+        onPathPointsUpdated: { _ in },
+        onRoomDataLoaded: nil
     )
 }

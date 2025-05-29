@@ -199,9 +199,9 @@ struct HabitRecommendationView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Image(systemName: "camera")
-                                    .font(.caption)
+                                    .font(.title3)
                                 Text("Camera Path")
-                                    .font(.caption2)
+                                    .font(.callout)
                                     .foregroundColor(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -210,9 +210,9 @@ struct HabitRecommendationView: View {
                             
                             VStack(alignment: .trailing) {
                                 Image(systemName: "sofa")
-                                    .font(.caption)
+                                    .font(.title3)
                                 Text("Furniture")
-                                    .font(.caption2)
+                                    .font(.callout)
                                     .foregroundColor(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .trailing)
