@@ -7,8 +7,9 @@ struct HabitRecommendationView: View {
     let roomData: CapturedRoom?
     let pathPoints: [PathPoint]
     
-    @State private var pathWeight: Double = 0.5
-    @State private var furnitureWeight: Double = 0.5
+    @State private var biasPosition: Double = 7.0 // 0=Camera Path, 5=Balanced, 10=Furniture
+    @State private var hasChangedFromDefault: Bool = false
+    @State private var showingAbout: Bool = false
     @State private var recommendation: SurfaceRecommendation?
     @State private var visualElements: [SCNNode] = []
     @State private var isLoading: Bool = false
@@ -21,6 +22,44 @@ struct HabitRecommendationView: View {
     
     private let recommendationEngine = RecommendationEngine()
     private let visualizer = RecommendationVisualizer()
+    
+    // Computed properties for weights based on bias position
+    private var pathWeight: Double {
+        return (10.0 - biasPosition) / 10.0
+    }
+    
+    private var furnitureWeight: Double {
+        return biasPosition / 10.0
+    }
+    
+    private var biasDescription: String {
+        switch biasPosition {
+        case 0:
+            return "100% Camera Path"
+        case 1:
+            return "90% Camera Path"
+        case 2:
+            return "80% Camera Path"
+        case 3:
+            return "70% Camera Path"
+        case 4:
+            return "60% Camera Path"
+        case 5:
+            return "Balanced (50/50)"
+        case 6:
+            return "60% Furniture"
+        case 7:
+            return "70% Furniture"
+        case 8:
+            return "80% Furniture"
+        case 9:
+            return "90% Furniture"
+        case 10:
+            return "100% Furniture"
+        default:
+            return "Custom (\(Int(furnitureWeight * 100))% Furniture)"
+        }
+    }
     
     var body: some View {
         ScrollView {
@@ -112,27 +151,87 @@ struct HabitRecommendationView: View {
                 
                 // Weight Adjustment Sliders
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Adjust Recommendation Weights")
-                        .font(.headline)
-                    
-                    VStack(alignment: .leading) {
-                        Text("Camera Path Weight: \(Int(pathWeight * 100))%")
-                        Slider(value: $pathWeight, in: 0...1)
-                            .onChange(of: pathWeight, initial: false) {
+                    HStack {
+                        Text("Adjust Importance")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        if hasChangedFromDefault {
+                            Button(action: {
+                                biasPosition = 7.0
+                                hasChangedFromDefault = false
                                 if hasGeneratedRecommendation {
                                     updateRecommendation()
                                 }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("Reset")
+                                }
                             }
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                        }
                     }
                     
-                    VStack(alignment: .leading) {
-                        Text("Furniture Weight: \(Int(furnitureWeight * 100))%")
-                        Slider(value: $furnitureWeight, in: 0...1)
-                            .onChange(of: furnitureWeight, initial: false) {
-                                if hasGeneratedRecommendation {
-                                    updateRecommendation()
+                    VStack(alignment: .leading, spacing: 12) {
+                        VStack(spacing: 8) {
+                            // Number ticks above slider
+                            HStack {
+                                ForEach(0...10, id: \.self) { number in
+                                    Text("\(number)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity)
                                 }
                             }
+                            
+                            Slider(value: $biasPosition, in: 0...10, step: 1)
+                                .onChange(of: biasPosition, initial: false) { _, _ in
+                                    hasChangedFromDefault = (biasPosition != 7.0)
+                                    if hasGeneratedRecommendation {
+                                        updateRecommendation()
+                                    }
+                                }
+                        }
+                        
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Image(systemName: "camera")
+                                    .font(.caption)
+                                Text("Camera Path")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing) {
+                                Image(systemName: "sofa")
+                                    .font(.caption)
+                                Text("Furniture")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("Tip: Adjust the slider to see how the recommended surface changes based on the importance of your camera path or the associated furniture.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            Button(action: {
+                                showingAbout = true
+                            }) {
+                                Image(systemName: "info.circle")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -160,6 +259,19 @@ struct HabitRecommendationView: View {
                 )
             } else {
                 Text("Room data is not available to edit furniture.")
+            }
+        }
+        .sheet(isPresented: $showingAbout) {
+            NavigationView {
+                AboutView()
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                showingAbout = false
+                            }
+                        }
+                    }
             }
         }
         .onChange(of: habit.associatedFurnitureTypes) {
