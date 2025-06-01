@@ -89,10 +89,10 @@ struct ContentView: View {
             .tag(3)
 
             NavigationView {
-                DataExportView()
+                AboutView()
             }
             .tabItem {
-                Label("Data Export", systemImage: "square.and.arrow.up")
+                Label("About", systemImage: "info.circle")
             }
             .tag(4)
         }

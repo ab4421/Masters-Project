@@ -74,6 +74,9 @@ class DataManager: ObservableObject {
         }
         
         saveUserData()
+        
+        // Check if notifications should be cancelled
+        NotificationManager.shared.checkAndCancelNotificationsIfNeeded()
     }
     
     func saveWellbeingEntry(answers: [Int]) {
@@ -97,6 +100,9 @@ class DataManager: ObservableObject {
         }
         
         saveUserData()
+        
+        // Check if notifications should be cancelled
+        NotificationManager.shared.checkAndCancelNotificationsIfNeeded()
     }
     
     // MARK: - Helper Methods
