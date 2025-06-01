@@ -11,11 +11,38 @@ import RoomPlan // Don't forget to import RoomPlan here
 
 struct ContentView: View {
     @StateObject private var roomDataManager = RoomDataManager.shared
+    @StateObject private var onboardingManager = OnboardingManager.shared
     @State private var selectedTab: Int = 0 // To programmatically change tabs
     @State private var scanAttempted: Bool = false // To know if we should even try to show recommendations
+    @State private var showOnboarding: Bool = false
     let isRoomPlanSupported = RoomCaptureSession.isSupported
 
     var body: some View {
+        Group {
+            if showOnboarding {
+                OnboardingView(showOnboarding: $showOnboarding)
+            } else {
+                mainAppView
+            }
+        }
+        .onAppear {
+            // Check if onboarding should be shown
+            showOnboarding = !onboardingManager.isCompleted
+            
+            // Check for persisted room data on app launch
+            if roomDataManager.hasPersistedRoom {
+                scanAttempted = true // Show recommendations tab as active
+                print("Found persisted room data - ready to load when needed")
+            }
+        }
+        .onChange(of: onboardingManager.onboardingState.isCompleted) { _, isCompleted in
+            if isCompleted {
+                showOnboarding = false
+            }
+        }
+    }
+    
+    private var mainAppView: some View {
         TabView(selection: $selectedTab) { // Add selection binding
             // Embed RoomScannerView in a NavigationView if you want a title bar for it
             NavigationView {
@@ -108,13 +135,6 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
             print("Received memory warning - clearing heavy resources immediately")
             clearHeavyResources()
-        }
-        .onAppear {
-            // Check for persisted room data on app launch
-            if roomDataManager.hasPersistedRoom {
-                scanAttempted = true // Show recommendations tab as active
-                print("Found persisted room data - ready to load when needed")
-            }
         }
     }
     

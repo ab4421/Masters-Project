@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct AboutView: View {
+    @StateObject private var onboardingManager = OnboardingManager.shared
+    @State private var showOnboarding = false
+    
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
@@ -35,6 +38,39 @@ struct AboutView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
+                
+                // Tutorial Section
+                VStack(alignment: .leading, spacing: 16) {
+                    SectionHeader(title: "Tutorial", icon: "play.circle.fill")
+                    
+                    VStack(spacing: 12) {
+                        Text("New to the app or want a refresher? Replay the interactive tutorial to learn about all features.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        Button(action: {
+                            onboardingManager.restartOnboarding()
+                            showOnboarding = true
+                        }) {
+                            HStack {
+                                Image(systemName: "play.circle.fill")
+                                Text("Replay Tutorial")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 32)
                 
                 // Core Concept Visual
                 VStack(alignment: .leading, spacing: 16) {
@@ -334,6 +370,9 @@ struct AboutView: View {
         }
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView(showOnboarding: $showOnboarding)
+        }
     }
 }
 
