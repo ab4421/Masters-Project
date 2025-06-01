@@ -193,6 +193,8 @@ struct HabitRecommendationView: View {
                                 if hasGeneratedRecommendation {
                                     updateRecommendation()
                                 }
+                                // Save the reset bias position
+                                configurationManager.saveConfiguration(for: habit, biasPosition: biasPosition)
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.counterclockwise")
@@ -222,6 +224,8 @@ struct HabitRecommendationView: View {
                                     if hasGeneratedRecommendation {
                                         updateRecommendation()
                                     }
+                                    // Save the bias position to persist the setting
+                                    configurationManager.saveConfiguration(for: habit, biasPosition: biasPosition)
                                 }
                         }
                         
@@ -311,16 +315,22 @@ struct HabitRecommendationView: View {
                 updateRecommendation()
             }
             updateDisplayedFurnitureList()
+            // Save configuration including current bias position
+            configurationManager.saveConfiguration(for: habit, biasPosition: biasPosition)
         }
         .onChange(of: habit.associatedFurnitureIndices) {
             if hasGeneratedRecommendation {
                 updateRecommendation()
             }
             updateDisplayedFurnitureList()
+            // Save configuration including current bias position
+            configurationManager.saveConfiguration(for: habit, biasPosition: biasPosition)
         }
         .onAppear {
             // Apply saved configuration if available
-            configurationManager.applyConfiguration(to: &habit)
+            if let savedBiasPosition = configurationManager.applyConfiguration(to: &habit) {
+                biasPosition = savedBiasPosition
+            }
             
             updateDisplayedFurnitureList()
             if !hasGeneratedRecommendation {

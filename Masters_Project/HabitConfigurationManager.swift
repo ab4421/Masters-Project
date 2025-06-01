@@ -7,12 +7,14 @@ struct HabitConfiguration: Codable {
     let habitID: UUID
     var associatedFurnitureTypes: [CapturedRoom.Object.Category]
     var associatedFurnitureIndices: [Int]
+    var biasPosition: Double
     let lastModified: Date
     
-    init(habitID: UUID, associatedFurnitureTypes: [CapturedRoom.Object.Category], associatedFurnitureIndices: [Int]) {
+    init(habitID: UUID, associatedFurnitureTypes: [CapturedRoom.Object.Category], associatedFurnitureIndices: [Int], biasPosition: Double = 7.0) {
         self.habitID = habitID
         self.associatedFurnitureTypes = associatedFurnitureTypes
         self.associatedFurnitureIndices = associatedFurnitureIndices
+        self.biasPosition = biasPosition
         self.lastModified = Date()
     }
 }
@@ -101,11 +103,12 @@ class HabitConfigurationManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    func saveConfiguration(for habit: Habit) {
+    func saveConfiguration(for habit: Habit, biasPosition: Double = 7.0) {
         let configuration = HabitConfiguration(
             habitID: habit.id,
             associatedFurnitureTypes: habit.associatedFurnitureTypes,
-            associatedFurnitureIndices: habit.associatedFurnitureIndices
+            associatedFurnitureIndices: habit.associatedFurnitureIndices,
+            biasPosition: biasPosition
         )
         
         configurations[habit.id.uuidString] = configuration
@@ -118,16 +121,17 @@ class HabitConfigurationManager: ObservableObject {
         return configurations[habitID.uuidString]
     }
     
-    func applyConfiguration(to habit: inout Habit) {
+    func applyConfiguration(to habit: inout Habit) -> Double? {
         guard let configuration = getConfiguration(for: habit.id) else {
             print("No saved configuration found for habit: \(habit.name)")
-            return
+            return nil
         }
         
         habit.associatedFurnitureTypes = configuration.associatedFurnitureTypes
         habit.associatedFurnitureIndices = configuration.associatedFurnitureIndices
         
         print("Applied saved configuration to habit: \(habit.name)")
+        return configuration.biasPosition
     }
     
     func deleteConfiguration(for habitID: UUID) {
