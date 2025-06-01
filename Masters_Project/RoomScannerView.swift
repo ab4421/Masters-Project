@@ -15,54 +15,6 @@ import UniformTypeIdentifiers // Add this for file type handling
 import simd // Add this for vector operations
 import ARKit // Add this for AR session access
 
-// Path tracking structures and manager
-public struct PathPoint: Codable {
-    let position: SIMD3<Float>
-    let timestamp: TimeInterval
-    let confidence: Float
-    
-    // Add coding keys to handle SIMD3<Float> serialization
-    enum CodingKeys: String, CodingKey {
-        case positionX, positionY, positionZ
-        case timestamp
-        case confidence
-    }
-    
-    // Custom encoding for SIMD3<Float>
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(position.x, forKey: .positionX)
-        try container.encode(position.y, forKey: .positionY)
-        try container.encode(position.z, forKey: .positionZ)
-        try container.encode(timestamp, forKey: .timestamp)
-        try container.encode(confidence, forKey: .confidence)
-    }
-    
-    // Custom decoding for SIMD3<Float>
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let x = try container.decode(Float.self, forKey: .positionX)
-        let y = try container.decode(Float.self, forKey: .positionY)
-        let z = try container.decode(Float.self, forKey: .positionZ)
-        position = SIMD3<Float>(x, y, z)
-        timestamp = try container.decode(TimeInterval.self, forKey: .timestamp)
-        confidence = try container.decode(Float.self, forKey: .confidence)
-    }
-    
-    // Keep the existing initializer
-    public init(position: SIMD3<Float>, timestamp: TimeInterval, confidence: Float) {
-        self.position = position
-        self.timestamp = timestamp
-        self.confidence = confidence
-    }
-}
-
-// Wrapper structure for export data
-struct RoomExportData: Codable {
-    let room: CapturedRoom
-    let pathPoints: [PathPoint]
-}
-
 public class PathTrackingManager {
     private var pathPoints: [PathPoint] = []
     private var lastUpdateTime: TimeInterval = 0
@@ -365,30 +317,14 @@ struct RoomScannerView: View {
 
     // Add export functionality
     private func exportRoomData(room: CapturedRoom) {
-        let destinationFolderURL = FileManager.default.temporaryDirectory.appending(path: "Export")
-        let destinationURL = destinationFolderURL.appending(path: "Room.usdz")
-        let capturedRoomURL = destinationFolderURL.appending(path: "Room.json")
+        // Ensure room data is in memory for export
+        if !roomDataManager.isRoomDataInMemory() {
+            roomDataManager.saveRoomData(room: room, pathPoints: pathTrackingManager.getPathPoints())
+        }
         
-        do {
-            try FileManager.default.createDirectory(at: destinationFolderURL, withIntermediateDirectories: true)
-            
-            // Create export data wrapper
-            let exportData = RoomExportData(
-                room: room,
-                pathPoints: pathTrackingManager.getPathPoints()
-            )
-            
-            // Export JSON data
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.outputFormatting = .prettyPrinted // Make the JSON more readable
-            let jsonData = try jsonEncoder.encode(exportData)
-            try jsonData.write(to: capturedRoomURL)
-            
-            // Export USDZ file
-            try room.export(to: destinationURL, exportOptions: .parametric)
-            
+        if let folderURL = ExportService.shared.exportRoomDataOnly() {
             // Present share sheet
-            let activityVC = UIActivityViewController(activityItems: [destinationFolderURL], applicationActivities: nil)
+            let activityVC = UIActivityViewController(activityItems: [folderURL], applicationActivities: nil)
             
             // Get the current window scene
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -397,8 +333,8 @@ struct RoomScannerView: View {
                 activityVC.modalPresentationStyle = .popover
                 rootViewController.present(activityVC, animated: true)
             }
-        } catch {
-            print("Error exporting room data: \(error)")
+        } else {
+            print("Error exporting room data via ExportService")
             // TODO: Show error alert to user
         }
     }

@@ -5,8 +5,9 @@ struct DataExportView: View {
     @StateObject private var roomDataManager = RoomDataManager.shared
     @State private var showShareSheet = false
     @State private var csvContent = ""
-    @State private var csvFileURL: URL?
+    @State private var exportFileURL: URL?
     @State private var showDeleteAlert = false
+    @State private var showExportTypeAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -165,10 +166,12 @@ struct DataExportView: View {
             }
             
             // Export Button
-            Button(action: exportData) {
+            Button(action: {
+                showExportTypeAlert = true
+            }) {
                 HStack {
                     Image(systemName: "square.and.arrow.up")
-                    Text("Export CSV Data")
+                    Text("Export Data")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -201,8 +204,8 @@ struct DataExportView: View {
         }
         .padding()
         .sheet(isPresented: $showShareSheet) {
-            if let csvFileURL = csvFileURL {
-                ShareSheet(activityItems: [csvFileURL])
+            if let exportFileURL = exportFileURL {
+                ShareSheet(activityItems: [exportFileURL])
             } else {
                 ShareSheet(activityItems: [csvContent])
             }
@@ -214,6 +217,28 @@ struct DataExportView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will permanently delete your saved room scan. This action cannot be undone.")
+        }
+        .alert("Export Data", isPresented: $showExportTypeAlert) {
+            if roomDataManager.hasPersistedRoom {
+                Button("All Data") {
+                    exportAllData()
+                }
+                Button("Habit & Wellbeing Only") {
+                    exportHabitDataOnly()
+                }
+                Button("Cancel", role: .cancel) { }
+            } else {
+                Button("Export Habit & Wellbeing") {
+                    exportHabitDataOnly()
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+        } message: {
+            if roomDataManager.hasPersistedRoom {
+                Text("Choose what data to export:\n\n• All Data: Includes room scan (USDZ & JSON) + habit/wellbeing CSV\n• Habit & Wellbeing Only: Just the CSV file")
+            } else {
+                Text("No room scan data available. Only habit and wellbeing data will be exported.")
+            }
         }
         .onAppear {
             csvContent = dataManager.generateCSV()
@@ -230,25 +255,30 @@ struct DataExportView: View {
         dataManager.userData.dailyEntries.values.compactMap { $0.wellbeingEntry }.count
     }
     
-    // MARK: - Functions
+    // MARK: - Export Functions
     
-    private func exportData() {
-        csvContent = dataManager.generateCSV()
-        
-        // Create temporary file with custom filename
-        let tempDirectory = FileManager.default.temporaryDirectory
-        let fileName = "\(dataManager.userData.userID) - data.csv"
-        let tempFileURL = tempDirectory.appendingPathComponent(fileName)
-        
-        do {
-            try csvContent.write(to: tempFileURL, atomically: true, encoding: .utf8)
-            csvFileURL = tempFileURL
-        } catch {
-            print("Error creating temporary file: \(error)")
-            csvFileURL = nil
+    private func exportAllData() {
+        // Ensure room data is loaded in memory
+        if roomDataManager.hasPersistedRoom && !roomDataManager.isRoomDataInMemory() {
+            roomDataManager.loadRoomData()
         }
         
-        showShareSheet = true
+        if let fileURL = ExportService.shared.exportAllData() {
+            exportFileURL = fileURL
+            showShareSheet = true
+        } else {
+            // Fallback to habit data only if room export fails
+            exportHabitDataOnly()
+        }
+    }
+    
+    private func exportHabitDataOnly() {
+        if let fileURL = ExportService.shared.exportHabitDataOnly() {
+            exportFileURL = fileURL
+            showShareSheet = true
+        }
+        // Update CSV content for preview
+        csvContent = dataManager.generateCSV()
     }
 }
 
