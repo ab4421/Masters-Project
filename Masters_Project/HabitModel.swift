@@ -8,7 +8,7 @@ enum HabitCategory: String, CaseIterable {
 }
 
 struct Habit: Identifiable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let description: String
     let category: HabitCategory
@@ -23,6 +23,7 @@ extension Habit {
     static let sampleHabits: [Habit] = [
         // Diet & Hydration Habits
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440001")!,
             name: "Consistent Hydration",
             description: "Place your water bottle in the red highlighted surface below within easy reach. Constant visual reminders and easy access make staying hydrated effortless throughout the day!",
             category: .diet,
@@ -32,6 +33,7 @@ extension Habit {
             associatedFurnitureIndices: []
         ),
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440002")!,
             name: "Healthy Snacking",
             description: "Position your fruit bowl in the red highlighted surface below in your kitchen area. Making healthy options the most visible choice encourages better eating habits!",
             category: .diet,
@@ -43,6 +45,7 @@ extension Habit {
         
         // Physical Activity Habits
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440003")!,
             name: "Daily Movement Cue",
             description: "Keep your yoga block or resistance band set in the red highlighted surface below where you relax. Having them visible reminds you to take movement breaks!",
             category: .activity,
@@ -52,6 +55,7 @@ extension Habit {
             associatedFurnitureIndices: []
         ),
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440004")!,
             name: "Quick Activity Prep",
             description: "Place your outdoor essentials tray in the red highlighted surface below near your exit. Having keys, sunglasses, and earbuds ready makes leaving for activities effortless!",
             category: .activity,
@@ -63,6 +67,7 @@ extension Habit {
         
         // Sleep Hygiene Habits
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440005")!,
             name: "Tech-Free Reading",
             description: "Keep your current book in the red highlighted surface below beside your bed. Having it immediately available makes choosing reading over screen time much easier before sleep!",
             category: .sleep,
@@ -72,6 +77,7 @@ extension Habit {
             associatedFurnitureIndices: []
         ),
         Habit(
+            id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440006")!,
             name: "Calming Bedtime Tea",
             description: "Set up your herbal tea canister and favorite mug in the red highlighted surface below near your kitchen water source. Having everything ready makes preparing a calming bedtime routine effortless!",
             category: .sleep,
@@ -81,4 +87,16 @@ extension Habit {
             associatedFurnitureIndices: []
         )
     ]
+    
+    /// Returns sample habits with applied user configurations if available
+    static func getConfiguredSampleHabits() -> [Habit] {
+        let configurationManager = HabitConfigurationManager.shared
+        var configuredHabits = sampleHabits
+        
+        for i in 0..<configuredHabits.count {
+            configurationManager.applyConfiguration(to: &configuredHabits[i])
+        }
+        
+        return configuredHabits
+    }
 } 

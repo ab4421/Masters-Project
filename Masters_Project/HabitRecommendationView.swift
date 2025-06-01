@@ -22,6 +22,7 @@ struct HabitRecommendationView: View {
     
     private let recommendationEngine = RecommendationEngine()
     private let visualizer = RecommendationVisualizer()
+    private let configurationManager = HabitConfigurationManager.shared
     
     // Computed properties for weights based on bias position
     private var pathWeight: Double {
@@ -285,7 +286,8 @@ struct HabitRecommendationView: View {
                     associatedFurnitureIndices: $habit.associatedFurnitureIndices,
                     allDetectedObjects: room.objects,
                     capturedRoom: roomData,
-                    pathPoints: pathPoints
+                    pathPoints: pathPoints,
+                    habit: habit
                 )
             } else {
                 Text("Room data is not available to edit furniture.")
@@ -317,6 +319,9 @@ struct HabitRecommendationView: View {
             updateDisplayedFurnitureList()
         }
         .onAppear {
+            // Apply saved configuration if available
+            configurationManager.applyConfiguration(to: &habit)
+            
             updateDisplayedFurnitureList()
             if !hasGeneratedRecommendation {
                 hasGeneratedRecommendation = true
@@ -573,7 +578,7 @@ struct HabitRecommendationView: View {
 #Preview {
     NavigationView {
         HabitRecommendationView(
-            habit: Habit.sampleHabits[0],
+            habit: Habit.getConfiguredSampleHabits()[0],
             roomData: nil,
             pathPoints: []
         )

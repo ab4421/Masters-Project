@@ -48,9 +48,9 @@ struct HabitSelectionView: View {
     let roomData: CapturedRoom?
     let pathPoints: [PathPoint]
     
-    // Pre-filter habits by category
+    // Pre-filter habits by category using configured habits
     private var habitsByCategory: [HabitCategory: [Habit]] {
-        Dictionary(grouping: Habit.sampleHabits) { $0.category }
+        Dictionary(grouping: Habit.getConfiguredSampleHabits()) { $0.category }
     }
     
     var body: some View {

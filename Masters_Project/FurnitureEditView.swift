@@ -10,18 +10,22 @@ struct FurnitureEditView: View {
     let allDetectedObjects: [CapturedRoom.Object]
     let capturedRoom: CapturedRoom?
     let pathPoints: [PathPoint]
+    let habit: Habit
 
     @State private var selectedIndices: Set<Int>
     @State private var highlightedObjectIndex: Int? // For temporary "locate" highlighting
     @State private var showingPreview: Bool = false
+    
+    private let configurationManager = HabitConfigurationManager.shared
 
-    init(isPresented: Binding<Bool>, associatedFurnitureTypes: Binding<[CapturedRoom.Object.Category]>, associatedFurnitureIndices: Binding<[Int]>, allDetectedObjects: [CapturedRoom.Object], capturedRoom: CapturedRoom?, pathPoints: [PathPoint]) {
+    init(isPresented: Binding<Bool>, associatedFurnitureTypes: Binding<[CapturedRoom.Object.Category]>, associatedFurnitureIndices: Binding<[Int]>, allDetectedObjects: [CapturedRoom.Object], capturedRoom: CapturedRoom?, pathPoints: [PathPoint], habit: Habit) {
         self._isPresented = isPresented
         self._associatedFurnitureTypes = associatedFurnitureTypes
         self._associatedFurnitureIndices = associatedFurnitureIndices
         self.allDetectedObjects = allDetectedObjects
         self.capturedRoom = capturedRoom
         self.pathPoints = pathPoints
+        self.habit = habit
         
         let matchingIndices = allDetectedObjects.enumerated().compactMap { index, object in
             associatedFurnitureTypes.wrappedValue.contains(object.category) ? index : nil
@@ -183,6 +187,13 @@ struct FurnitureEditView: View {
                             index < allDetectedObjects.count ? allDetectedObjects[index].category : nil
                         }
                         associatedFurnitureTypes = Array(Set(selectedCategories))
+                        
+                        // Save configuration to persistence
+                        var updatedHabit = habit
+                        updatedHabit.associatedFurnitureTypes = associatedFurnitureTypes
+                        updatedHabit.associatedFurnitureIndices = associatedFurnitureIndices
+                        configurationManager.saveConfiguration(for: updatedHabit)
+                        
                         isPresented = false
                     }
                 }
@@ -247,7 +258,17 @@ struct FurnitureEditView: View {
                 associatedFurnitureIndices: $associatedIndices,
                 allDetectedObjects: [], // Empty array to avoid initialization issues
                 capturedRoom: nil, // No room data available in preview
-                pathPoints: []
+                pathPoints: [],
+                habit: Habit(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!,
+                    name: "Sample Habit",
+                    description: "Sample description",
+                    category: .activity,
+                    associatedObject: "Sample Object",
+                    iconName: "star.fill",
+                    associatedFurnitureTypes: [],
+                    associatedFurnitureIndices: []
+                )
             )
         }
     }
