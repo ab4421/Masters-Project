@@ -10,11 +10,9 @@ import SwiftUI
 import RoomPlan // Don't forget to import RoomPlan here
 
 struct ContentView: View {
-    @State private var capturedRoom: CapturedRoom? = nil // Explicitly initialize as nil
+    @StateObject private var roomDataManager = RoomDataManager.shared
     @State private var selectedTab: Int = 0 // To programmatically change tabs
     @State private var scanAttempted: Bool = false // To know if we should even try to show recommendations
-    @State private var pathPoints: [PathPoint] = []
-    @State private var showMemoryAlert: Bool = false // Show alert when memory was cleared
     let isRoomPlanSupported = RoomCaptureSession.isSupported
 
     var body: some View {
@@ -22,11 +20,11 @@ struct ContentView: View {
             // Embed RoomScannerView in a NavigationView if you want a title bar for it
             NavigationView {
                 RoomScannerView(
-                    capturedRoom: $capturedRoom,
+                    capturedRoom: $roomDataManager.currentRoom,
                     scanAttempted: $scanAttempted,
                     isRoomPlanSupported: isRoomPlanSupported,
                     onPathPointsUpdated: { points in
-                        pathPoints = points
+                        // This is handled by RoomDataManager now
                     },
                     onRoomDataLoaded: {
                         // Room data was successfully loaded
@@ -43,17 +41,23 @@ struct ContentView: View {
             // or a placeholder if no scan has been successfully completed yet.
             // Embed RecommendationView in a NavigationView for its own title
             NavigationView {
-                if scanAttempted && capturedRoom != nil {
+                if (scanAttempted && roomDataManager.currentRoom != nil) || roomDataManager.hasPersistedRoom {
                     HabitSelectionView(
-                        roomData: capturedRoom,
-                        pathPoints: pathPoints
+                        roomData: roomDataManager.currentRoom,
+                        pathPoints: roomDataManager.currentPathPoints
                     )
+                    .onAppear {
+                        // Load room data if we have persisted data but it's not in memory
+                        if roomDataManager.hasPersistedRoom && !roomDataManager.isRoomDataInMemory() {
+                            roomDataManager.loadRoomData()
+                        }
+                    }
                 } else {
                     VStack {
                         Text("Scan a room to see recommendations.")
                             .font(.headline)
                             .padding(.bottom)
-                        if scanAttempted && capturedRoom == nil {
+                        if scanAttempted && roomDataManager.currentRoom == nil && !roomDataManager.hasPersistedRoom {
                             Text("(Previous scan might have failed or was cancelled)")
                                 .font(.caption)
                                 .foregroundColor(.gray)
@@ -64,7 +68,7 @@ struct ContentView: View {
                 }
             }
             .tabItem {
-                Label("Recommendations", systemImage: capturedRoom != nil && scanAttempted ? "lightbulb.fill" : "lightbulb")
+                Label("Recommendations", systemImage: (roomDataManager.currentRoom != nil || roomDataManager.hasPersistedRoom) && (scanAttempted || roomDataManager.hasPersistedRoom) ? "lightbulb.fill" : "lightbulb")
             }
             .tag(1)
 
@@ -85,62 +89,48 @@ struct ContentView: View {
             .tag(3)
 
             NavigationView {
-                AboutView()
+                DataExportView()
             }
             .tabItem {
-                Label("About", systemImage: "info.circle")
+                Label("Data Export", systemImage: "square.and.arrow.up")
             }
             .tag(4)
         }
         // MARK: - App Lifecycle Management for Memory Optimization
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-            print("App entering background - clearing heavy memory objects")
+            print("App entering background - clearing room data from memory")
             clearHeavyResources()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             print("App entering foreground")
-            // Room data will need to be re-imported/scanned if it was cleared
+            // No alerts needed - the UI will show the saved data status naturally
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
             print("Received memory warning - clearing heavy resources immediately")
             clearHeavyResources()
         }
-        .alert("Memory Cleared", isPresented: $showMemoryAlert) {
-            Button("OK") {
-                resetToFreshState()
+        .onAppear {
+            // Check for persisted room data on app launch
+            if roomDataManager.hasPersistedRoom {
+                scanAttempted = true // Show recommendations tab as active
+                print("Found persisted room data - ready to load when needed")
             }
-        } message: {
-            Text("Room data was cleared to save memory while the app was in the background. Please re-scan your room or import a previously saved scan to continue.")
         }
     }
     
     // MARK: - Memory Management
     private func clearHeavyResources() {
-        // Only clear if we actually have heavy objects to clear
-        if capturedRoom != nil || !pathPoints.isEmpty {
-            print("Clearing CapturedRoom (\(capturedRoom?.walls.count ?? 0) walls, \(capturedRoom?.objects.count ?? 0) objects) and \(pathPoints.count) path points")
-            
-            // Clear the heavy memory objects
-            capturedRoom = nil
-            pathPoints.removeAll()
-            
-            // Show alert to user explaining what happened
-            showMemoryAlert = true
-            
-            // Force garbage collection to free memory immediately
-            autoreleasepool {
-                // This helps ensure objects are deallocated immediately
+        // Only clear if we actually have heavy objects in memory
+        if roomDataManager.isRoomDataInMemory() {
+            if let roomInfo = roomDataManager.getRoomInfo() {
+                print("Clearing room data from memory: \(roomInfo.wallCount) walls, \(roomInfo.objectCount) objects, \(roomInfo.pathPointCount) path points")
             }
             
-            print("Heavy resources cleared successfully")
+            // Clear from memory but keep persisted - no user alert needed
+            roomDataManager.clearFromMemory()
+            
+            print("Room data cleared from memory but remains saved to disk")
         }
-    }
-    
-    private func resetToFreshState() {
-        // Reset all state to fresh app launch
-        scanAttempted = false
-        selectedTab = 0 // Go back to scanner tab
-        print("App reset to fresh state")
     }
 }
 

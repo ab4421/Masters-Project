@@ -2,9 +2,11 @@ import SwiftUI
 
 struct DataExportView: View {
     @StateObject private var dataManager = DataManager.shared
+    @StateObject private var roomDataManager = RoomDataManager.shared
     @State private var showShareSheet = false
     @State private var csvContent = ""
     @State private var csvFileURL: URL?
+    @State private var showDeleteAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -19,9 +21,99 @@ struct DataExportView: View {
                     .foregroundColor(.secondary)
             }
             
-            // Data Summary
+            // Room Data Summary
             VStack(alignment: .leading, spacing: 12) {
-                Text("Data Summary")
+                Text("Room Scan Data")
+                    .font(.headline)
+                
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Status:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack {
+                            Image(systemName: roomDataManager.hasPersistedRoom ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(roomDataManager.hasPersistedRoom ? .green : .red)
+                            Text(roomDataManager.hasPersistedRoom ? "Saved" : "No Data")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    if roomDataManager.hasPersistedRoom {
+                        VStack(alignment: .leading) {
+                            Text("In Memory:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                Image(systemName: roomDataManager.isRoomDataInMemory() ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(roomDataManager.isRoomDataInMemory() ? .green : .orange)
+                                Text(roomDataManager.isRoomDataInMemory() ? "Loaded" : "On Disk")
+                                    .font(.subheadline)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+                
+                if roomDataManager.hasPersistedRoom {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            roomDataManager.loadRoomData()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Load Room")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .disabled(roomDataManager.isRoomDataInMemory())
+                        
+                        Button(action: {
+                            roomDataManager.clearFromMemory()
+                        }) {
+                            HStack {
+                                Image(systemName: "memories")
+                                Text("Clear Memory")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .disabled(!roomDataManager.isRoomDataInMemory())
+                        
+                        Button(action: {
+                            showDeleteAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+            
+            // Habit & Wellbeing Data Summary
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Habit & Wellbeing Data")
                     .font(.headline)
                 
                 HStack {
@@ -114,6 +206,14 @@ struct DataExportView: View {
             } else {
                 ShareSheet(activityItems: [csvContent])
             }
+        }
+        .alert("Delete Room Data", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                roomDataManager.deletePersistedData()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete your saved room scan. This action cannot be undone.")
         }
         .onAppear {
             csvContent = dataManager.generateCSV()

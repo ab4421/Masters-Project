@@ -138,6 +138,7 @@ struct RoomScannerView: View {
     @State private var importError: String = ""
     @State private var documentPickerDelegate: ImportDocumentPickerDelegate?
     @State var pathTrackingManager = PathTrackingManager()
+    @StateObject private var roomDataManager = RoomDataManager.shared
 
     var body: some View {
         Group {
@@ -145,22 +146,67 @@ struct RoomScannerView: View {
             case .intro:
                 VStack(spacing: 32) {
                     Spacer()
-                    Text("RoomPlan")
-                        .font(.largeTitle).bold()
-                    if isRoomPlanSupported {
-                        Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.\n\n💡 Tip: After scanning, use the Export button to save your scan for future use. You can then import it later to avoid re-scanning.")
-                            .multilineTextAlignment(.center)
-                            .font(.body)
+                    
+                    // Show saved room data prominently if available
+                    if roomDataManager.hasPersistedRoom {
+                        VStack(spacing: 16) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.green)
+                                Text("Saved Room Found!")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                            }
+                            
+                            Text("You have a previously saved room scan. You can load it to continue where you left off, or scan a new room.")
+                                .multilineTextAlignment(.center)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                            
+                            Button(action: {
+                                loadPersistedRoom()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Load Saved Room")
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.green)
+                                .cornerRadius(20)
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                        .padding()
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(16)
+                        .padding(.horizontal, 20)
                     } else {
-                        Text("Your phone does not support scanning, but you can import a previously saved scan.\n\n💡 Tip: If you have exported scans from other devices, you can import them here.")
-                            .multilineTextAlignment(.center)
-                            .font(.body)
-                            .foregroundColor(.orange)
+                        // Normal intro text when no saved room
+                        Text("RoomPlan")
+                            .font(.largeTitle).bold()
+                        
+                        if isRoomPlanSupported {
+                            Text("To scan your room, point your device at all the walls, windows, doors and furniture in your space until your scan is complete.\n\nYou can see a preview of your scan at the bottom of the screen so you can make sure your scan is correct.\n\n💡 Tip: After scanning, use the Export button to save your scan for future use.")
+                                .multilineTextAlignment(.center)
+                                .font(.body)
+                        } else {
+                            Text("Your phone does not support scanning, but you can import a previously saved scan.\n\n💡 Tip: If you have exported scans from other devices, you can import them here.")
+                                .multilineTextAlignment(.center)
+                                .font(.body)
+                                .foregroundColor(.orange)
+                        }
                     }
+                    
                     Spacer()
+                    
                     HStack(spacing: 20) {
                         Button(action: { scanState = .scanning }) {
-                            Text("Start Scanning")
+                            Text(roomDataManager.hasPersistedRoom ? "Scan New Room" : "Start Scanning")
                                 .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -197,9 +243,22 @@ struct RoomScannerView: View {
                         pathTrackingManager.clearPath()
                     },
                     onDone: {
+                        // Auto-save when scan completes
+                        if let room = capturedRoom {
+                            roomDataManager.saveRoomData(room: room, pathPoints: pathTrackingManager.getPathPoints())
+                            onPathPointsUpdated(pathTrackingManager.getPathPoints())
+                            print("Auto-saved new room scan with \(room.walls.count) walls")
+                        }
                         scanState = .preview
                     },
-                    onRoomDataLoaded: onRoomDataLoaded
+                    onRoomDataLoaded: {
+                        // This callback is for when new room data is scanned/loaded
+                        if let room = capturedRoom {
+                            roomDataManager.saveRoomData(room: room, pathPoints: pathTrackingManager.getPathPoints())
+                            print("Saved room data from scan completion")
+                        }
+                        onRoomDataLoaded?()
+                    }
                 )
                 .edgesIgnoringSafeArea(.all)
             case .preview:
@@ -284,6 +343,23 @@ struct RoomScannerView: View {
                 scanState = .intro
                 pathTrackingManager.clearPath()
             }
+        }
+    }
+
+    // MARK: - Private Methods
+    
+    private func loadPersistedRoom() {
+        roomDataManager.loadRoomData()
+        if let room = roomDataManager.currentRoom {
+            capturedRoom = room
+            pathTrackingManager.setPathPoints(roomDataManager.currentPathPoints)
+            onPathPointsUpdated(roomDataManager.currentPathPoints)
+            scanAttempted = true
+            scanState = .preview
+            onRoomDataLoaded?()
+            print("Successfully loaded saved room with \(room.walls.count) walls and \(room.objects.count) objects")
+        } else {
+            print("Failed to load saved room data")
         }
     }
 
@@ -408,6 +484,9 @@ struct RoomScannerView: View {
                 
                 // Update the state on the main thread
                 DispatchQueue.main.async {
+                    // Auto-save imported data through RoomDataManager
+                    self.roomDataManager.saveRoomData(room: importedData.room, pathPoints: importedData.pathPoints)
+                    
                     self.capturedRoom = importedData.room
                     self.pathTrackingManager.setPathPoints(importedData.pathPoints)
                     self.onPathPointsUpdated(importedData.pathPoints)
