@@ -224,7 +224,9 @@ struct RoomScannerView: View {
                             pathPoints: pathTrackingManager.getPathPoints(),
                             visualElements: [],
                             recommendedObjectIndex: nil,
-                            candidateObjectIndices: []
+                            candidateObjectIndices: [],
+                            candidateColor: .purple,
+                            recommendedColor: .red
                         )
                         .frame(height: 350)
                         .padding()
@@ -531,6 +533,20 @@ struct RoomPreviewView: UIViewRepresentable {
     let recommendedObjectIndex: Int?
     let candidateObjectIndices: [Int]
     
+    // Optional color parameters for different contexts
+    let candidateColor: UIColor
+    let recommendedColor: UIColor
+    
+    init(capturedRoom: CapturedRoom, pathPoints: [PathPoint], visualElements: [SCNNode], recommendedObjectIndex: Int?, candidateObjectIndices: [Int], candidateColor: UIColor = .purple, recommendedColor: UIColor = .red) {
+        self.capturedRoom = capturedRoom
+        self.pathPoints = pathPoints
+        self.visualElements = visualElements
+        self.recommendedObjectIndex = recommendedObjectIndex
+        self.candidateObjectIndices = candidateObjectIndices
+        self.candidateColor = candidateColor
+        self.recommendedColor = recommendedColor
+    }
+    
     func makeUIView(context: Context) -> SCNView {
         let scnView = SCNView()
         scnView.scene = createScene(from: capturedRoom)
@@ -557,7 +573,7 @@ struct RoomPreviewView: UIViewRepresentable {
         directionalLight.intensity = 800
         let directionalNode = SCNNode()
         directionalNode.light = directionalLight
-        directionalNode.position = SCNVector3(x: 5, y: 5, z: 5)
+        directionalNode.position = SCNVector3(5, 5, 5)
         scnView.scene?.rootNode.addChildNode(directionalNode)
         
         // Set up camera
@@ -565,7 +581,7 @@ struct RoomPreviewView: UIViewRepresentable {
         camera.zFar = 100
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(x: 0, y: 2, z: 5)
+        cameraNode.position = SCNVector3(0, 2, 5)
         scnView.scene?.rootNode.addChildNode(cameraNode)
         
         // Add path points
@@ -771,14 +787,17 @@ struct RoomPreviewView: UIViewRepresentable {
             newTransform.columns.3.z += offset.z
             
             node.simdTransform = newTransform
-            // Highlight top face if this is a candidate object
-            if candidateObjectIndices.contains(index) {
-                visualizer.highlightTopFace(of: node, color: UIColor.purple)
-            }
-            // Highlight top face if this is the recommended object (overrides candidate color)
+            
+            // Highlight objects based on selection state
+            // Priority: recommendedObjectIndex > candidateObjectIndices
             if let recIdx = recommendedObjectIndex, index == recIdx {
-                visualizer.highlightTopFace(of: node, color: UIColor.red)
+                // Highlighted/recommended object (highest priority)
+                visualizer.highlightTopFace(of: node, color: recommendedColor)
+            } else if candidateObjectIndices.contains(index) {
+                // Candidate/selected objects
+                visualizer.highlightTopFace(of: node, color: candidateColor)
             }
+            
             scene.rootNode.addChildNode(node)
             
             // Track category counts and create appropriate label using FurnitureEditView logic

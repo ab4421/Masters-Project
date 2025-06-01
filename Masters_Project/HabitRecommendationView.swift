@@ -122,7 +122,9 @@ struct HabitRecommendationView: View {
                             pathPoints: pathPoints,
                             visualElements: visualElements,
                             recommendedObjectIndex: recommendedGlobalIndex,
-                            candidateObjectIndices: candidateIndices
+                            candidateObjectIndices: candidateIndices,
+                            candidateColor: .purple,
+                            recommendedColor: .red
                         )
                         .frame(height: 300)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -135,6 +137,32 @@ struct HabitRecommendationView: View {
                                 .cornerRadius(12)
                         }
                     }
+                    
+                    // Legend
+                    HStack(spacing: 20) {
+                        HStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.purple.opacity(0.7))
+                                .frame(width: 16, height: 16)
+                            Text("Candidate Surfaces")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        if recommendedGlobalIndex != nil {
+                            HStack(spacing: 4) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.red.opacity(0.7))
+                                    .frame(width: 16, height: 16)
+                                Text("Recommended Surface")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 8)
                 } else {
                     Text("No room scan available")
                         .foregroundColor(.gray)
@@ -255,7 +283,9 @@ struct HabitRecommendationView: View {
                     isPresented: $isEditingFurniture,
                     associatedFurnitureTypes: $habit.associatedFurnitureTypes,
                     associatedFurnitureIndices: $habit.associatedFurnitureIndices,
-                    allDetectedObjects: room.objects
+                    allDetectedObjects: room.objects,
+                    capturedRoom: roomData,
+                    pathPoints: pathPoints
                 )
             } else {
                 Text("Room data is not available to edit furniture.")
