@@ -285,7 +285,7 @@ struct AboutView: View {
                     ], spacing: 12) {
                         ResearchPillar(
                             icon: "brain.head.profile",
-                            title: "Environmental Psychology",
+                            title: "Psychology",
                             description: "How spaces shape behavior",
                             color: .purple
                         )
@@ -724,12 +724,14 @@ struct UserJourneyVisual: View {
                 JourneyStep(icon: "target", title: "Place", color: .orange)
             }
             
-            HStack(spacing: 8) {
-                JourneyStep(icon: "checkmark.circle", title: "Track", color: .purple)
-                JourneyArrow()
-                JourneyStep(icon: "heart.text.square", title: "Measure", color: .red)
+            HStack {
                 Spacer()
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    JourneyStep(icon: "checkmark.circle", title: "Track", color: .purple)
+                    JourneyArrow()
+                    JourneyStep(icon: "heart.text.square", title: "Measure", color: .red)
+                }
+                Spacer()
             }
         }
         .padding(16)
