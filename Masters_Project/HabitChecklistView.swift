@@ -3,6 +3,8 @@ import SwiftUI
 struct HabitChecklistView: View {
     @State private var isHabitCompleted: Bool = false
     @State private var areObjectsInPlace: Bool = false
+    @State private var showSaveConfirmation: Bool = false
+    @StateObject private var dataManager = DataManager.shared
     
     // Get current date in the format: Tuesday, 20th May 2025
     private var formattedDate: String {
@@ -24,6 +26,11 @@ struct HabitChecklistView: View {
     
     private let motivationalMessage = "Keep up the great work and stay consistent with your habit!"
     
+    // Check if data exists for today
+    private var hasDataForToday: Bool {
+        dataManager.getTodayEntry()?.habitEntry != nil
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -39,6 +46,18 @@ struct HabitChecklistView: View {
                 }
                 .padding(.top)
                 .padding(.horizontal)
+                
+                // Data Status Indicator
+                if hasDataForToday {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Habit data submitted for today")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                }
                 
                 // Habit Checklist
                 VStack(alignment: .leading, spacing: 16) {
@@ -87,14 +106,68 @@ struct HabitChecklistView: View {
                     .onTapGesture {
                         areObjectsInPlace.toggle()
                     }
+                    
+                    // Submit Button
+                    Button(action: submitHabitData) {
+                        HStack {
+                            Image(systemName: hasDataForToday ? "arrow.clockwise" : "checkmark")
+                            Text(hasDataForToday ? "Update Today's Data" : "Submit")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .font(.headline)
+                    }
+                    .padding(.top)
                 }
                 .padding(.horizontal)
+                
+                // Navigation to Data Export View
+                NavigationLink(destination: DataExportView()) {
+                    Text("See Saved Data")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .font(.headline)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8) // Add some space above this button
                 
                 Spacer(minLength: 0)
             }
             .padding(.bottom)
         }
         .navigationTitle("Habit Checklist")
+        .onAppear {
+            loadTodayData()
+        }
+        .alert("Data Saved!", isPresented: $showSaveConfirmation) {
+            Button("OK") { }
+        } message: {
+            Text(hasDataForToday ? "Your habit data has been updated for today." : "Your habit data has been saved for today.")
+        }
+    }
+    
+    // MARK: - Functions
+    
+    private func submitHabitData() {
+        dataManager.saveHabitEntry(
+            habitCompleted: isHabitCompleted,
+            objectsInPlace: areObjectsInPlace
+        )
+        showSaveConfirmation = true
+    }
+    
+    private func loadTodayData() {
+        if let todayEntry = dataManager.getTodayEntry(),
+           let habitEntry = todayEntry.habitEntry {
+            isHabitCompleted = habitEntry.habitCompleted
+            areObjectsInPlace = habitEntry.objectsInPlace
+        }
     }
 }
 
