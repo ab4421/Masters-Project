@@ -11,6 +11,12 @@ struct SurfaceRecommendation {
     let distanceFromFurniture: Float
 }
 
+// Structure to hold both best and second-best recommendations
+struct RecommendationResult {
+    let best: SurfaceRecommendation?
+    let secondBest: SurfaceRecommendation?
+}
+
 // Structure to hold recommendation settings
 struct RecommendationSettings {
     var pathWeight: Float = 0.5
@@ -32,17 +38,21 @@ struct RecommendationSettings {
 }
 
 class RecommendationEngine {
-    // Find the best surface for a habit based on path points and associated furniture
-    func findBestSurface(
+    // Find the best and second-best surfaces for a habit based on path points and associated furniture
+    func findBestSurfaces(
         pathPoints: [PathPoint],
         associatedFurniture: [SCNNode],
         surfaces: [SCNNode],
         settings: RecommendationSettings = RecommendationSettings()
-    ) -> SurfaceRecommendation? {
-        guard !surfaces.isEmpty else { return nil }
+    ) -> RecommendationResult {
+        guard !surfaces.isEmpty else { 
+            return RecommendationResult(best: nil, secondBest: nil)
+        }
         
         var bestRecommendation: SurfaceRecommendation?
+        var secondBestRecommendation: SurfaceRecommendation?
         var bestScore: Float = Float.infinity
+        var secondBestScore: Float = Float.infinity
         
         for (index, surface) in surfaces.enumerated() {
             // Calculate average distance from path points
@@ -61,10 +71,25 @@ class RecommendationEngine {
             // ADD THIS LOG
             print("--- Engine evaluating surface index: \(index) (Original Object ID: \(surface.name ?? "N/A")) | PathDist: \(pathDistance) | FurnDist: \(furnitureDistance) | Score: \(score)")
             
-            // Update best recommendation if this score is better
+            // Update best and second-best recommendations
             if score < bestScore {
+                // New best found - move current best to second-best
+                secondBestScore = bestScore
+                secondBestRecommendation = bestRecommendation
+                
+                // Update best
                 bestScore = score
                 bestRecommendation = SurfaceRecommendation(
+                    surface: surface,
+                    objectIndex: index,
+                    score: score,
+                    distanceFromPath: pathDistance,
+                    distanceFromFurniture: furnitureDistance
+                )
+            } else if score < secondBestScore {
+                // New second-best found
+                secondBestScore = score
+                secondBestRecommendation = SurfaceRecommendation(
                     surface: surface,
                     objectIndex: index,
                     score: score,
@@ -74,7 +99,22 @@ class RecommendationEngine {
             }
         }
         
-        return bestRecommendation
+        return RecommendationResult(best: bestRecommendation, secondBest: secondBestRecommendation)
+    }
+    
+    // Legacy method for backward compatibility - now calls the new method
+    func findBestSurface(
+        pathPoints: [PathPoint],
+        associatedFurniture: [SCNNode],
+        surfaces: [SCNNode],
+        settings: RecommendationSettings = RecommendationSettings()
+    ) -> SurfaceRecommendation? {
+        return findBestSurfaces(
+            pathPoints: pathPoints,
+            associatedFurniture: associatedFurniture,
+            surfaces: surfaces,
+            settings: settings
+        ).best
     }
     
     // Calculate average distance from path points to surface

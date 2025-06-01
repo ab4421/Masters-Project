@@ -224,9 +224,11 @@ struct RoomScannerView: View {
                             pathPoints: pathTrackingManager.getPathPoints(),
                             visualElements: [],
                             recommendedObjectIndex: nil,
+                            secondBestObjectIndex: nil,
                             candidateObjectIndices: [],
                             candidateColor: .purple,
-                            recommendedColor: .red
+                            recommendedColor: .red,
+                            secondBestColor: .orange
                         )
                         .frame(height: 350)
                         .padding()
@@ -531,20 +533,24 @@ struct RoomPreviewView: UIViewRepresentable {
     let pathPoints: [PathPoint]
     let visualElements: [SCNNode]
     let recommendedObjectIndex: Int?
+    let secondBestObjectIndex: Int?
     let candidateObjectIndices: [Int]
     
     // Optional color parameters for different contexts
     let candidateColor: UIColor
     let recommendedColor: UIColor
+    let secondBestColor: UIColor
     
-    init(capturedRoom: CapturedRoom, pathPoints: [PathPoint], visualElements: [SCNNode], recommendedObjectIndex: Int?, candidateObjectIndices: [Int], candidateColor: UIColor = .purple, recommendedColor: UIColor = .red) {
+    init(capturedRoom: CapturedRoom, pathPoints: [PathPoint], visualElements: [SCNNode], recommendedObjectIndex: Int?, secondBestObjectIndex: Int? = nil, candidateObjectIndices: [Int], candidateColor: UIColor = .purple, recommendedColor: UIColor = .red, secondBestColor: UIColor = .orange) {
         self.capturedRoom = capturedRoom
         self.pathPoints = pathPoints
         self.visualElements = visualElements
         self.recommendedObjectIndex = recommendedObjectIndex
+        self.secondBestObjectIndex = secondBestObjectIndex
         self.candidateObjectIndices = candidateObjectIndices
         self.candidateColor = candidateColor
         self.recommendedColor = recommendedColor
+        self.secondBestColor = secondBestColor
     }
     
     func makeUIView(context: Context) -> SCNView {
@@ -789,12 +795,15 @@ struct RoomPreviewView: UIViewRepresentable {
             node.simdTransform = newTransform
             
             // Highlight objects based on selection state
-            // Priority: recommendedObjectIndex > candidateObjectIndices
+            // Priority: recommendedObjectIndex > secondBestObjectIndex > candidateObjectIndices
             if let recIdx = recommendedObjectIndex, index == recIdx {
                 // Highlighted/recommended object (highest priority)
                 visualizer.highlightTopFace(of: node, color: recommendedColor)
+            } else if let secondIdx = secondBestObjectIndex, index == secondIdx {
+                // Second-best object (second priority)
+                visualizer.highlightTopFace(of: node, color: secondBestColor)
             } else if candidateObjectIndices.contains(index) {
-                // Candidate/selected objects
+                // Candidate/selected objects (lowest priority)
                 visualizer.highlightTopFace(of: node, color: candidateColor)
             }
             

@@ -94,7 +94,7 @@ extension Habit {
         var configuredHabits = sampleHabits
         
         for i in 0..<configuredHabits.count {
-            configurationManager.applyConfiguration(to: &configuredHabits[i])
+            _ = configurationManager.applyConfiguration(to: &configuredHabits[i])
         }
         
         return configuredHabits

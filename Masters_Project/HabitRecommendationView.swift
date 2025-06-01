@@ -11,12 +11,14 @@ struct HabitRecommendationView: View {
     @State private var hasChangedFromDefault: Bool = false
     @State private var showingAbout: Bool = false
     @State private var recommendation: SurfaceRecommendation?
+    @State private var secondBestRecommendation: SurfaceRecommendation?
     @State private var visualElements: [SCNNode] = []
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
     @State private var hasGeneratedRecommendation: Bool = false
     @State private var candidateIndices: [Int] = []
     @State private var recommendedGlobalIndex: Int? = nil
+    @State private var secondBestGlobalIndex: Int? = nil
     @State private var isEditingFurniture: Bool = false
     @State private var displayedFurnitureNamesList: [String] = []
     
@@ -123,9 +125,11 @@ struct HabitRecommendationView: View {
                             pathPoints: pathPoints,
                             visualElements: visualElements,
                             recommendedObjectIndex: recommendedGlobalIndex,
+                            secondBestObjectIndex: secondBestGlobalIndex,
                             candidateObjectIndices: candidateIndices,
-                            candidateColor: .purple,
-                            recommendedColor: .red
+                            candidateColor: UIColor.systemGreen.withAlphaComponent(0.8),
+                            recommendedColor: .red,
+                            secondBestColor: UIColor.systemYellow.withAlphaComponent(0.9)
                         )
                         .frame(height: 300)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -139,29 +143,56 @@ struct HabitRecommendationView: View {
                         }
                     }
                     
-                    // Legend
-                    HStack(spacing: 20) {
-                        HStack(spacing: 4) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.purple.opacity(0.7))
-                                .frame(width: 16, height: 16)
-                            Text("Candidate Surfaces")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        if recommendedGlobalIndex != nil {
-                            HStack(spacing: 4) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.red.opacity(0.7))
-                                    .frame(width: 16, height: 16)
-                                Text("Recommended Surface")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                    // Legend - moved back below the preview
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .center, spacing: 20) {
+                            if recommendedGlobalIndex != nil {
+                                HStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.red.opacity(0.7))
+                                        .frame(width: 16, height: 16)
+                                    if let best = recommendation {
+                                        Text("Best Surface (Score: \(String(format: "%.2f", best.score)))")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else {
+                                        Text("Best Surface")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
                             }
+                            
+                            if secondBestGlobalIndex != nil {
+                                HStack(spacing: 4) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.yellow.opacity(0.8))
+                                        .frame(width: 16, height: 16)
+                                    if let secondBest = secondBestRecommendation {
+                                        Text("2nd Best (Score: \(String(format: "%.2f", secondBest.score)))")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else {
+                                        Text("2nd Best")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            
+                            Spacer()
                         }
                         
-                        Spacer()
+                        // Score difference information
+                        if let best = recommendation, let secondBest = secondBestRecommendation {
+                            let scoreDifference = secondBest.score - best.score
+                            let percentageDifference = (scoreDifference / best.score) * 100
+                            
+                            Text("Score difference: \(String(format: "%.2f", scoreDifference)) (\(String(format: "%.1f", percentageDifference))% higher)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .italic()
+                        }
                     }
                     .padding(.top, 8)
                 } else {
@@ -400,17 +431,19 @@ struct HabitRecommendationView: View {
             print("Warning: No associated furniture found in the room")
         }
         
-        let newRecommendation = recommendationEngine.findBestSurface(
+        let recommendationResult = recommendationEngine.findBestSurfaces(
             pathPoints: pathPoints,
             associatedFurniture: furniture,
             surfaces: surfaces,
             settings: settings
         )
         
-        print(">>> DEBUG: New recommendation for habit '\\(habit.name)': \\(String(describing: newRecommendation))")
-
-        recommendation = newRecommendation
+        recommendation = recommendationResult.best
+        secondBestRecommendation = recommendationResult.secondBest
         
+        print(">>> DEBUG: Best recommendation for habit '\(habit.name)': \(String(describing: recommendation))")
+        print(">>> DEBUG: Second-best recommendation for habit '\(habit.name)': \(String(describing: secondBestRecommendation))")
+
         if recommendation == nil {
             errorMessage = "Could not find a suitable surface for placement"
         }
@@ -434,28 +467,32 @@ struct HabitRecommendationView: View {
             return idx
         }
         candidateIndices = indices
+        
         // Compute global recommended index from surfaces-array index
         if let rec = recommendation, rec.objectIndex < candidateIndices.count {
             recommendedGlobalIndex = candidateIndices[rec.objectIndex]
         } else {
             recommendedGlobalIndex = nil
         }
-        print("[Candidate Indices] \(indices)")
         
-        // Log recommendation details and draw connection lines
+        // Compute global second-best index from surfaces-array index
+        if let secondBest = secondBestRecommendation, secondBest.objectIndex < candidateIndices.count {
+            secondBestGlobalIndex = candidateIndices[secondBest.objectIndex]
+        } else {
+            secondBestGlobalIndex = nil
+        }
+        
+        print("[Candidate Indices] \(indices)")
+        print("[Recommended Global Index] \(String(describing: recommendedGlobalIndex))")
+        print("[Second-Best Global Index] \(String(describing: secondBestGlobalIndex))")
+        
+        // Log recommendation details
         if let recommendation = recommendation {
-            print("[Recommended Surface] Index: \(recommendation.objectIndex), Score: \(recommendation.score), DistanceFromPath: \(recommendation.distanceFromPath), DistanceFromFurniture: \(recommendation.distanceFromFurniture)")
-            // Removed line drawing to reduce visual clutter
-            // let pathLines = visualizer.createPathLines(
-            //     from: pathPoints,
-            //     to: recommendation.surface
-            // )
-            // visualElements.append(contentsOf: pathLines)
-            // let furnitureLines = visualizer.createFurnitureLines(
-            //     from: furniture,
-            //     to: recommendation.surface
-            // )
-            // visualElements.append(contentsOf: furnitureLines)
+            print("[Best Surface] Index: \(recommendation.objectIndex), Score: \(recommendation.score), DistanceFromPath: \(recommendation.distanceFromPath), DistanceFromFurniture: \(recommendation.distanceFromFurniture)")
+        }
+        
+        if let secondBest = secondBestRecommendation {
+            print("[Second-Best Surface] Index: \(secondBest.objectIndex), Score: \(secondBest.score), DistanceFromPath: \(secondBest.distanceFromPath), DistanceFromFurniture: \(secondBest.distanceFromFurniture)")
         }
         
         // Log associated furniture
