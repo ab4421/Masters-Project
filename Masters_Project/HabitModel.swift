@@ -57,12 +57,12 @@ extension Habit {
         ),
         Habit(
             id: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440004")!,
-            name: "Quick Activity Prep",
-            description: "Place your outdoor essentials tray in the red highlighted surface below near your exit. Having keys, sunglasses, and earbuds ready makes leaving for activities effortless!",
+            name: "Workout Essentials",
+            description: "Place your workout outfit and essentials in the red highlighted surface below near your bed. Having a water bottle, sunglasses, and earbuds ready makes leaving for workouts effortless in the morning!",
             category: .activity,
             associatedObject: "Essentials Tray",
-            iconName: "tray.fill",
-            associatedFurnitureTypes: [.storage, .fireplace],
+            iconName: "figure.run",
+            associatedFurnitureTypes: [.bed, .chair],
             associatedFurnitureIndices: []
         ),
         
@@ -74,7 +74,7 @@ extension Habit {
             category: .sleep,
             associatedObject: "Physical Book",
             iconName: "book.fill",
-            associatedFurnitureTypes: [.bed, .storage],
+            associatedFurnitureTypes: [.bed],
             associatedFurnitureIndices: []
         ),
         Habit(
@@ -84,7 +84,7 @@ extension Habit {
             category: .sleep,
             associatedObject: "Tea Set",
             iconName: "cup.and.saucer.fill",
-            associatedFurnitureTypes: [.sink, .stove],
+            associatedFurnitureTypes: [.sink, .stove, .oven],
             associatedFurnitureIndices: []
         )
     ]
