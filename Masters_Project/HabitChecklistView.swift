@@ -46,7 +46,7 @@ struct HabitChecklistView: View {
                     Text("Today is \(formattedDate)!")
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                     Text(motivationalMessage)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
