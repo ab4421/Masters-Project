@@ -5,6 +5,8 @@ struct HabitChecklistView: View {
     @State private var areObjectsInPlace: Bool = false
     @State private var showSaveConfirmation: Bool = false
     @StateObject private var dataManager = DataManager.shared
+    @StateObject private var configurationManager = HabitConfigurationManager.shared
+    @StateObject private var roomDataManager = RoomDataManager.shared
     
     // Get current date in the format: Tuesday, 20th May 2025
     private var formattedDate: String {
@@ -31,6 +33,11 @@ struct HabitChecklistView: View {
         dataManager.getTodayEntry()?.habitEntry != nil
     }
     
+    // Get starred habit
+    private var starredHabit: Habit? {
+        configurationManager.getStarredHabit()
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -46,6 +53,85 @@ struct HabitChecklistView: View {
                 }
                 .padding(.top)
                 .padding(.horizontal)
+                
+                // Starred Habit Section
+                if let starred = starredHabit {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                                .font(.title3)
+                            Text("Current Focus Habit")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: starred.iconName)
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 40, height: 40)
+                                    .background(Color.blue.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(starred.name)
+                                        .font(.title3)
+                                        .fontWeight(.medium)
+                                    Text(starred.associatedObject)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                            
+                            NavigationLink(destination: destinationView(for: starred)) {
+                                HStack {
+                                    Image(systemName: "location.circle.fill")
+                                    Text("View Placement Guide")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding()
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundColor(.blue)
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(radius: 2)
+                    .padding(.horizontal)
+                } else {
+                    // No starred habit message
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "star")
+                                .foregroundColor(.gray)
+                                .font(.title3)
+                            Text("No Focus Habit Selected")
+                                .font(.headline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        
+                        Text("Star a habit from the recommendations to track it here!")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
                 
                 // Data Status Indicator
                 if hasDataForToday {
@@ -167,6 +253,23 @@ struct HabitChecklistView: View {
            let habitEntry = todayEntry.habitEntry {
             isHabitCompleted = habitEntry.habitCompleted
             areObjectsInPlace = habitEntry.objectsInPlace
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    @ViewBuilder
+    private func destinationView(for habit: Habit) -> some View {
+        HabitRecommendationView(
+            habit: habit,
+            roomData: roomDataManager.currentRoom,
+            pathPoints: roomDataManager.currentPathPoints
+        )
+        .onAppear {
+            // Same loading logic as ContentView - load room data if we have persisted data but it's not in memory
+            if roomDataManager.hasPersistedRoom && !roomDataManager.isRoomDataInMemory() {
+                roomDataManager.loadRoomData()
+            }
         }
     }
 }

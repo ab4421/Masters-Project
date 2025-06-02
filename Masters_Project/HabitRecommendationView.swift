@@ -24,7 +24,7 @@ struct HabitRecommendationView: View {
     
     private let recommendationEngine = RecommendationEngine()
     private let visualizer = RecommendationVisualizer()
-    private let configurationManager = HabitConfigurationManager.shared
+    @StateObject private var configurationManager = HabitConfigurationManager.shared
     
     // Computed properties for weights based on bias position
     private var pathWeight: Double {
@@ -64,6 +64,11 @@ struct HabitRecommendationView: View {
         }
     }
     
+    // Computed property for star state
+    private var isStarred: Bool {
+        configurationManager.isHabitStarred(habit.id)
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -77,9 +82,17 @@ struct HabitRecommendationView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(habit.name)
-                            .font(.title2)
-                            .bold()
+                        HStack {
+                            Text(habit.name)
+                                .font(.title2)
+                                .bold()
+                            
+                            Button(action: toggleStar) {
+                                Image(systemName: isStarred ? "star.fill" : "star")
+                                    .font(.title3)
+                                    .foregroundColor(isStarred ? .yellow : .gray)
+                            }
+                        }
                         Text(habit.associatedObject)
                             .font(.subheadline)
                             .foregroundColor(.gray)
@@ -619,6 +632,16 @@ struct HabitRecommendationView: View {
         print("\nTotal associated furniture items found: \(furniture.count)")
         print("=== End Associated Furniture Detection ===\n")
         return furniture
+    }
+    
+    // MARK: - Star Management
+    
+    private func toggleStar() {
+        if isStarred {
+            configurationManager.unstarHabit()
+        } else {
+            configurationManager.starHabit(habit.id)
+        }
     }
 }
 

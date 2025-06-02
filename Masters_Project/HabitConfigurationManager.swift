@@ -21,6 +21,7 @@ struct HabitConfiguration: Codable {
 
 struct HabitConfigurationData: Codable {
     var configurations: [String: HabitConfiguration] // Key: habitID.uuidString
+    var starredHabitID: String? // Key: habitID.uuidString
 }
 
 // MARK: - Manager Class
@@ -30,6 +31,7 @@ class HabitConfigurationManager: ObservableObject {
     
     @Published var configurations: [String: HabitConfiguration] = [:]
     @Published var hasPersistedConfigurations: Bool = false
+    @Published var starredHabitID: UUID? = nil
     
     private let fileName = "habit_configurations.json"
     
@@ -62,6 +64,7 @@ class HabitConfigurationManager: ObservableObject {
             print("No persisted habit configurations found")
             configurations = [:]
             hasPersistedConfigurations = false
+            starredHabitID = nil
             return
         }
         
@@ -72,13 +75,18 @@ class HabitConfigurationManager: ObservableObject {
             let configurationData = try decoder.decode(HabitConfigurationData.self, from: data)
             
             configurations = configurationData.configurations
+            starredHabitID = configurationData.starredHabitID != nil ? UUID(uuidString: configurationData.starredHabitID!) : nil
             hasPersistedConfigurations = true
             
             print("Successfully loaded \(configurations.count) habit configurations")
+            if let starredID = starredHabitID {
+                print("Loaded starred habit ID: \(starredID)")
+            }
         } catch {
             print("Error loading habit configurations: \(error)")
             configurations = [:]
             hasPersistedConfigurations = false
+            starredHabitID = nil
         }
     }
     
@@ -86,7 +94,10 @@ class HabitConfigurationManager: ObservableObject {
         let fileURL = Self.getFileURL()
         
         do {
-            let configurationData = HabitConfigurationData(configurations: configurations)
+            let configurationData = HabitConfigurationData(
+                configurations: configurations,
+                starredHabitID: starredHabitID?.uuidString
+            )
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = .prettyPrinted
@@ -96,6 +107,9 @@ class HabitConfigurationManager: ObservableObject {
             
             hasPersistedConfigurations = true
             print("Successfully saved \(configurations.count) habit configurations")
+            if let starredID = starredHabitID {
+                print("Saved starred habit ID: \(starredID)")
+            }
         } catch {
             print("Error saving habit configurations: \(error)")
         }
@@ -143,6 +157,7 @@ class HabitConfigurationManager: ObservableObject {
     
     func clearAllConfigurations() {
         configurations.removeAll()
+        starredHabitID = nil
         
         let fileURL = Self.getFileURL()
         do {
@@ -155,6 +170,32 @@ class HabitConfigurationManager: ObservableObject {
         }
         
         hasPersistedConfigurations = false
+    }
+    
+    // MARK: - Starred Habit Methods
+    
+    func starHabit(_ habitID: UUID) {
+        starredHabitID = habitID
+        saveConfigurations()
+        print("Starred habit: \(habitID)")
+    }
+    
+    func unstarHabit() {
+        starredHabitID = nil
+        saveConfigurations()
+        print("Unstarred habit")
+    }
+    
+    func getStarredHabit() -> Habit? {
+        guard let starredID = starredHabitID else { return nil }
+        
+        // Look for the habit in all available habits
+        let allHabits = Habit.getAllHabits()
+        return allHabits.first { $0.id == starredID }
+    }
+    
+    func isHabitStarred(_ habitID: UUID) -> Bool {
+        return starredHabitID == habitID
     }
     
     // MARK: - Utility Methods
