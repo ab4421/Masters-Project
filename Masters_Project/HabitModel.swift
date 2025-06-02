@@ -1,13 +1,14 @@
 import Foundation
 import RoomPlan
 
-enum HabitCategory: String, CaseIterable {
+enum HabitCategory: String, CaseIterable, Codable {
     case activity = "Activity"
     case diet = "Diet"
     case sleep = "Sleep"
+    case custom = "Custom"
 }
 
-struct Habit: Identifiable {
+struct Habit: Identifiable, Codable {
     let id: UUID
     let name: String
     let description: String
@@ -98,5 +99,13 @@ extension Habit {
         }
         
         return configuredHabits
+    }
+    
+    /// Returns all habits (sample + custom) with applied configurations
+    static func getAllHabits() -> [Habit] {
+        let sampleHabits = getConfiguredSampleHabits()
+        let customHabits = CustomHabitManager.shared.customHabits
+        
+        return sampleHabits + customHabits
     }
 } 
