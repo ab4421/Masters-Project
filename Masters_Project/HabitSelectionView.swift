@@ -8,6 +8,13 @@ struct HabitRow: View {
     let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
     
+    @StateObject private var configurationManager = HabitConfigurationManager.shared
+    
+    // Computed property for star state
+    private var isStarred: Bool {
+        configurationManager.isHabitStarred(habit.id)
+    }
+    
     var body: some View {
         HStack {
             Image(systemName: habit.iconName)
@@ -22,6 +29,13 @@ struct HabitRow: View {
             }
             
             Spacer()
+            
+            // Star indicator (only show if starred)
+            if isStarred {
+                Image(systemName: "star.fill")
+                    .font(.title3)
+                    .foregroundColor(.yellow)
+            }
             
             if isCustomHabit {
                 Menu {
