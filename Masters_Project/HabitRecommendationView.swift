@@ -252,12 +252,12 @@ struct HabitRecommendationView: View {
                     
                     VStack(alignment: .leading, spacing: 12) {
                         VStack(spacing: 8) {
-                            // Number ticks above slider
+                            // Visual ticks above slider
                             HStack {
-                                ForEach(0...10, id: \.self) { number in
-                                    Text("\(number)")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
+                                ForEach(0...10, id: \.self) { _ in
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.4))
+                                        .frame(width: 1, height: 8)
                                         .frame(maxWidth: .infinity)
                                 }
                             }
