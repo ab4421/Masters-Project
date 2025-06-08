@@ -1,10 +1,6 @@
 # Habit Home
 **Habit Formation Through Environmental Design**
 
-<div align="center">
-  <img src="Assets.xcassets/AppIcon.appiconset/Green%20House%20with%20Checkmark%20Icon.png" alt="Smart Living Spaces Logo" width="120" height="120">
-</div>
-
 ## Overview
 
 Smart Living Spaces is an iOS research application that uses advanced 3D room scanning and AI analysis to optimize object placement for better habit formation. By combining environmental psychology with cutting-edge AR technology, the app helps users create spaces that naturally encourage healthy behaviors.
